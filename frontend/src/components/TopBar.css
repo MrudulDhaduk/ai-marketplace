@@ -1,0 +1,391 @@
+/* ════════════════════════════════════════════════
+   TopBar.css
+   Uses ONLY existing CSS variables — zero hardcoded colors.
+   Works in both ClientDashboard and DeveloperDashboard contexts.
+════════════════════════════════════════════════ */
+
+/* ── Shell ──────────────────────────────────── */
+.topbar {
+  position:         sticky;
+  z-index:          30;
+  display:          flex;
+  align-items:      center;
+  justify-content:  space-between;
+  gap:              20px;
+  padding:          0 28px;
+  height:           65px;
+  background:       color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:  blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom:    1px solid var(--border);
+  animation:        topbar-rise 0.45s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+@keyframes topbar-rise {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Left ───────────────────────────────────── */
+.topbar-left {
+  display:     flex;
+  align-items: baseline;
+  gap:         10px;
+  min-width:   0;
+  flex-shrink: 0;
+}
+
+.topbar-title {
+  font-size:      18px;
+  font-weight:    700;
+  letter-spacing: -0.3px;
+  color:          var(--text);
+  white-space:    nowrap;
+  line-height:    1;
+}
+
+.topbar-count {
+  font-size:   12.5px;
+  font-weight: 500;
+  color:       var(--cyan);
+  background:  var(--cyan-dim);
+  border:      1px solid color-mix(in srgb, var(--cyan) 25%, transparent);
+  padding:     2px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+  line-height: 1.6;
+}
+
+/* ── Right ──────────────────────────────────── */
+.topbar-right {
+  display:     flex;
+  align-items: center;
+  gap:         10px;
+  flex-shrink: 0;
+}
+
+/* ── Search ─────────────────────────────────── */
+.topbar-search {
+  position:    relative;
+  display:     flex;
+  align-items: center;
+  background:  var(--surface);
+  border:      1px solid var(--border);
+  border-radius: 9px;
+  transition:  border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.topbar-search--focus {
+  border-color: color-mix(in srgb, var(--cyan) 50%, transparent);
+  box-shadow:
+    0 0 0 3px var(--cyan-dim),
+    0 0 12px color-mix(in srgb, var(--cyan-glow, var(--cyan)) 20%, transparent);
+}
+
+.topbar-search-icon {
+  position:       absolute;
+  left:           10px;
+  width:          16px;
+  height:         16px;
+  color:          var(--text-2);
+  display:        flex;
+  align-items:    center;
+  pointer-events: none;
+  transition:     color 0.2s ease;
+}
+.topbar-search-icon svg { width: 14px; height: 14px; }
+
+.topbar-search--focus .topbar-search-icon { color: var(--cyan); }
+
+.topbar-search-input {
+  padding:     8px 32px 8px 32px;
+  background:  transparent;
+  border:      none;
+  color:       var(--text);
+  font-family: inherit;
+  font-size:   13.5px;
+  font-weight: 400;
+  width:       210px;
+  outline:     none;
+  line-height: 1;
+}
+.topbar-search-input::placeholder { color: var(--text-3); }
+
+.topbar-search-clear {
+  position:      absolute;
+  right:         8px;
+  width:         20px;
+  height:        20px;
+  border-radius: 5px;
+  border:        none;
+  background:    transparent;
+  color:         var(--text-2);
+  cursor:        pointer;
+  display:       flex;
+  align-items:   center;
+  justify-content: center;
+  font-size:     16px;
+  line-height:   1;
+  transition:    color 0.15s ease, background 0.15s ease;
+}
+.topbar-search-clear:hover {
+  color:       var(--text);
+  background:  var(--surface-2);
+}
+
+/* ── Notification bell ──────────────────────── */
+.topbar-icon-btn {
+  position:        relative;
+  width:           36px;
+  height:          36px;
+  border-radius:   9px;
+  border:          1px solid var(--border);
+  background:      var(--surface);
+  color:           var(--text-2);
+  cursor:          pointer;
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  transition:      all 0.18s ease;
+  flex-shrink:     0;
+}
+.topbar-icon-btn svg { width: 16px; height: 16px; }
+.topbar-icon-btn:hover {
+  border-color: var(--border-hi);
+  color:        var(--text);
+  background:   var(--surface-2);
+  transform:    translateY(-1px);
+}
+.topbar-icon-btn:active { transform: scale(0.96); }
+
+.topbar-notif-dot {
+  position:      absolute;
+  top:           7px;
+  right:         7px;
+  width:         7px;
+  height:        7px;
+  border-radius: 50%;
+  background:    var(--cyan);
+  border:        2px solid var(--surface);
+  box-shadow:    0 0 6px var(--cyan-glow, var(--cyan));
+  animation:     notif-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes notif-pulse {
+  0%,100% { box-shadow: 0 0 6px var(--cyan-glow, var(--cyan)); }
+  50%     { box-shadow: 0 0 12px var(--cyan-glow, var(--cyan)); }
+}
+
+/* ── Profile trigger ────────────────────────── */
+.topbar-profile { position: relative; }
+
+.topbar-avatar-btn {
+  display:       flex;
+  align-items:   center;
+  gap:           9px;
+  padding:       5px 10px 5px 5px;
+  border-radius: 10px;
+  border:        1px solid var(--border);
+  background:    var(--surface);
+  cursor:        pointer;
+  transition:    all 0.2s ease;
+  color:         var(--text);
+}
+.topbar-avatar-btn:hover,
+.topbar-avatar-btn--open {
+  border-color: var(--border-hi);
+  background:   var(--surface-2);
+}
+.topbar-avatar-btn:hover .topbar-avatar {
+  transform:  scale(1.06);
+  box-shadow: 0 0 0 2px var(--surface-2), 0 0 0 3px color-mix(in srgb, var(--cyan) 35%, transparent);
+}
+
+.topbar-avatar {
+  width:           32px;
+  height:          32px;
+  border-radius:   8px;
+  background:      linear-gradient(135deg, var(--cyan), var(--violet));
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-weight:     700;
+  font-size:       13px;
+  color:           #fff;
+  flex-shrink:     0;
+  transition:      transform 0.22s cubic-bezier(0.34,1.56,0.64,1),
+                   box-shadow 0.22s ease;
+}
+
+.topbar-user-info {
+  display:        flex;
+  flex-direction: column;
+  gap:            1px;
+  text-align:     left;
+}
+.topbar-username {
+  font-size:   13px;
+  font-weight: 600;
+  color:       var(--text);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.topbar-role {
+  font-size:  11px;
+  color:      var(--cyan);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.topbar-chevron {
+  display:    flex;
+  align-items: center;
+  color:       var(--text-2);
+  transition:  transform 0.22s cubic-bezier(0.34,1.56,0.64,1);
+}
+.topbar-chevron svg      { width: 14px; height: 14px; }
+.topbar-chevron--open    { transform: rotate(180deg); }
+
+/* ── Dropdown ───────────────────────────────── */
+.topbar-dropdown {
+  position:      absolute;
+  top:           calc(100% + 8px);
+  right:         0;
+  z-index:       100;
+  min-width:     210px;
+  background:    var(--surface-2);
+  border:        1px solid var(--border-hi);
+  border-radius: 13px;
+  padding:       6px;
+  box-shadow:    0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2);
+
+  /* Entrance animation */
+  animation:     drop-in 0.22s cubic-bezier(0.16,1,0.3,1) both;
+  transform-origin: top right;
+}
+
+@keyframes drop-in {
+  from {
+    opacity:   0;
+    transform: scale(0.93) translateY(-6px);
+  }
+  to {
+    opacity:   1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* User card in dropdown */
+.topbar-drop-user {
+  display:     flex;
+  align-items: center;
+  gap:         10px;
+  padding:     10px 12px 10px 10px;
+  border-radius: 8px;
+  margin-bottom: 2px;
+}
+.topbar-drop-avatar {
+  width:           36px;
+  height:          36px;
+  border-radius:   9px;
+  background:      linear-gradient(135deg, var(--cyan), var(--violet));
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-weight:     700;
+  font-size:       14px;
+  color:           #fff;
+  flex-shrink:     0;
+  box-shadow:      0 0 12px color-mix(in srgb, var(--cyan-glow, var(--cyan)) 40%, transparent);
+}
+.topbar-drop-name {
+  font-size:   13.5px;
+  font-weight: 600;
+  color:       var(--text);
+  line-height: 1.25;
+}
+.topbar-drop-email {
+  font-size:  11.5px;
+  color:      var(--text-2);
+  line-height: 1.3;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow:   hidden;
+  text-overflow: ellipsis;
+  max-width:  140px;
+}
+
+/* Divider */
+.topbar-drop-divider {
+  height:     1px;
+  background: var(--border);
+  margin:     4px 0;
+}
+
+/* Menu items */
+.topbar-drop-item {
+  display:     flex;
+  align-items: center;
+  gap:         10px;
+  width:       100%;
+  padding:     9px 12px;
+  border-radius: 7px;
+  border:      none;
+  background:  transparent;
+  color:       var(--text-2);
+  font-family: inherit;
+  font-size:   13.5px;
+  font-weight: 500;
+  cursor:      pointer;
+  text-align:  left;
+  transition:  background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+.topbar-drop-item:hover {
+  background: var(--surface-3, var(--surface));
+  color:      var(--text);
+  transform:  translateX(2px);
+}
+.topbar-drop-item:active { transform: scale(0.98); }
+
+.topbar-drop-icon {
+  width:  18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.16s ease;
+}
+.topbar-drop-icon svg     { width: 15px; height: 15px; }
+.topbar-drop-item:hover .topbar-drop-icon { opacity: 1; }
+
+/* Danger (logout) */
+.topbar-drop-item--danger        { color: color-mix(in srgb, var(--text-2) 80%, #f87171 20%); }
+.topbar-drop-item--danger:hover  {
+  color:       #f87171;
+  background:  rgba(248,113,113,0.08);
+  transform:   translateX(2px);
+}
+
+/* ════════════════════════════════════════════════
+   RESPONSIVE
+════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .topbar             { padding: 0 14px; gap: 10px; }
+  .topbar-search-input { width: 140px; }
+  .topbar-user-info    { display: none; }
+  .topbar-chevron      { display: none; }
+  .topbar-avatar-btn   { padding: 4px; }
+}
+
+@media (max-width: 420px) {
+  .topbar-search { display: none; }
+}
+
+.topbar-count strong {
+  color: var(--cyan);
+  font-weight: 600;
+}

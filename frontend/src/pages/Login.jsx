@@ -1,18 +1,163 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import '../auth.css';
+import { useNavigate } from "react-router-dom";
+/* ─────────────────────────────────────────
+   Reusable AuthInput (mirrors Signup page)
+───────────────────────────────────────── */
+function AuthInput({ field, value, onChange, onFocus, onBlur, focused, errors }) {
+  const hasError = !!errors[field.name];
+  const isValid  = !hasError && value.length > 0;
 
+  const inputClass = [
+    'auth-input',
+    focused === field.name ? 'auth-input--focused' : '',
+    hasError               ? 'auth-input--error'   : '',
+    isValid                ? 'auth-input--valid'   : '',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <div className={`auth-field${hasError ? ' auth-field--error' : ''}`}>
+      <div className="auth-label-row">
+        <label className="auth-label" htmlFor={field.name}>
+          {field.label}
+        </label>
+        {field.name === 'password' && (
+          <a href="#" className="auth-forgot">Forgot password?</a>
+        )}
+      </div>
+
+      <div className="auth-input-wrapper">
+        <input
+          id={field.name}
+          name={field.name}
+          type={field.type}
+          placeholder={field.placeholder}
+          value={value}
+          onChange={onChange}
+          onFocus={() => onFocus(field.name)}
+          onBlur={() => onBlur('')}
+          className={inputClass}
+          autoComplete={field.name === 'password' ? 'current-password' : 'username'}
+          aria-invalid={hasError}
+          aria-describedby={hasError ? `${field.name}-error` : undefined}
+        />
+
+        {/* Status icon */}
+        {hasError && (
+          <span className="auth-input-icon auth-input-icon--error" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="9" stroke="#f87171" strokeWidth="1.6"/>
+              <path d="M10 5.5v5M10 13.5v.5" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+          </span>
+        )}
+      </div>
+
+      {hasError && (
+        <p id={`${field.name}-error`} className="auth-error" role="alert">
+          {errors[field.name]}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   Validation
+───────────────────────────────────────── */
+function validate(form) {
+  const errors = {};
+
+  if (!form.username.trim()) {
+    errors.username = 'Username is required.';
+  }
+
+  if (!form.password) {
+    errors.password = 'Password is required.';
+  }
+
+  return errors;
+}
+
+/* ─────────────────────────────────────────
+   Login Page
+───────────────────────────────────────── */
 function Login() {
   const [form, setForm]       = useState({ username: '', password: '' });
+  const [errors, setErrors]   = useState({});
   const [focused, setFocused] = useState('');
-
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-  const handleSubmit = (e) => { e.preventDefault(); console.log(form); };
-
+  const [loading, setLoading] = useState(false);
+  const [shake, setShake]     = useState(false);
+  const formRef               = useRef(null);
+  const navigate = useNavigate(); 
   const fields = [
     { name: 'username', label: 'Username', type: 'text',     placeholder: 'ada_lovelace' },
     { name: 'password', label: 'Password', type: 'password', placeholder: '••••••••••••' },
   ];
+
+  /* Clear field error as user types */
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  /* Trigger shake + set errors */
+  const triggerShake = () => {
+    setShake(true);
+    setTimeout(() => setShake(false), 420);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const validationErrors = validate(form);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      triggerShake();
+      return;
+    }
+
+    setLoading(true);
+    setErrors({});
+
+    try {
+      const res = await fetch('http://localhost:5000/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: form.username.trim(),
+          password: form.password,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        /* Server returned an error — surface it as a banner */
+        setErrors({
+          general: data?.message || 'Invalid username or password. Please try again.',
+        });
+        triggerShake();
+      } else {
+        /* Success */
+        console.log('Login successful:', data);
+        // TODO: redirect / store token here
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        navigate("/dashboard");
+      }
+    } catch {
+      setErrors({
+        general: 'Invalid Username or Password.',
+      });
+      triggerShake();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="auth-page">
@@ -42,7 +187,6 @@ function Login() {
             review bids, and collaborate with expert developers.
           </p>
 
-          {/* Stat strip */}
           <div className="auth-stats">
             <div className="auth-stat">
               <div className="auth-stat-num">340+</div>
@@ -75,34 +219,42 @@ function Login() {
 
           <div className="auth-divider"><span>OR</span></div>
 
-          <form className="auth-form" onSubmit={handleSubmit}>
+          {/* ── General / banner error ── */}
+          {errors.general && (
+            <div className="auth-error--banner" role="alert">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <circle cx="10" cy="10" r="9" stroke="#f87171" strokeWidth="1.6"/>
+                <path d="M10 5.5v5M10 13.5v.5" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+              {errors.general}
+            </div>
+          )}
+
+          <form
+            ref={formRef}
+            className={`auth-form${shake ? ' auth-form--shake' : ''}`}
+            onSubmit={handleSubmit}
+            noValidate
+          >
             {fields.map((field) => (
-              <div className="auth-field" key={field.name}>
-                <div className="auth-label-row">
-                  <label className="auth-label" htmlFor={field.name}>
-                    {field.label}
-                  </label>
-                  {field.name === 'password' && (
-                    <a href="#" className="auth-forgot">Forgot password?</a>
-                  )}
-                </div>
-                <input
-                  id={field.name}
-                  name={field.name}
-                  type={field.type}
-                  placeholder={field.placeholder}
-                  value={form[field.name]}
-                  onChange={handleChange}
-                  onFocus={() => setFocused(field.name)}
-                  onBlur={() => setFocused('')}
-                  className={`auth-input${focused === field.name ? ' auth-input--focused' : ''}`}
-                  autoComplete={field.name === 'password' ? 'current-password' : 'username'}
-                />
-              </div>
+              <AuthInput
+                key={field.name}
+                field={field}
+                value={form[field.name]}
+                onChange={handleChange}
+                onFocus={setFocused}
+                onBlur={() => setFocused('')}
+                focused={focused}
+                errors={errors}
+              />
             ))}
 
-            <button type="submit" className="auth-submit-btn">
-              Sign In →
+            <button
+              type="submit"
+              className="auth-submit-btn"
+              disabled={loading}
+            >
+              {loading ? <LoadingSpinner /> : 'Sign In →'}
             </button>
           </form>
 
@@ -113,6 +265,18 @@ function Login() {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ── Micro spinner for loading state ── */
+function LoadingSpinner() {
+  return (
+    <span className="auth-spinner" aria-label="Signing in…">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,0.3)" strokeWidth="2.5"/>
+        <path d="M12 2a10 10 0 0 1 10 10" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+      </svg>
+    </span>
   );
 }
 

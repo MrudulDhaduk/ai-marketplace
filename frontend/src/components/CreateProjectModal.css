@@ -1,0 +1,828 @@
+/* ════════════════════════════════════════════════════════════════
+   CreateProjectModal.css  ·  Forge UI  ·  v2
+   Orange primary: #ff7a18
+   All original class names preserved + new cpm-* namespace added.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Overlay ──────────────────────────────────────────────────── */
+.cpm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+
+  background: rgba(4, 5, 10, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  animation: cpm-overlay-in 0.22s ease both;
+}
+
+.cpm-overlay--out {
+  animation: cpm-overlay-out 0.24s ease both;
+}
+
+/* ── Modal shell ──────────────────────────────────────────────── */
+.cpm-modal {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+
+  background: #0a0c14;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 20px;
+  overflow: hidden;
+
+  box-shadow:
+    0 0 0 1px rgba(255, 122, 24, 0.05),
+    0 32px 80px rgba(0, 0, 0, 0.7),
+    0 8px 32px rgba(0, 0, 0, 0.5);
+
+  animation: cpm-modal-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.04s;
+}
+
+.cpm-modal--out {
+  animation: cpm-modal-out 0.24s cubic-bezier(0.4, 0, 1, 1) both !important;
+}
+
+/* ── Top edge glow — the "forge" signature ─────────────────────── */
+.cpm-top-glow {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #ff7a18, transparent);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.cpm-top-glow::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: radial-gradient(ellipse at 50% 0%, rgba(255, 122, 24, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ── Header ───────────────────────────────────────────────────── */
+.cpm-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 28px 28px 0;
+}
+
+.cpm-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ff7a18;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.cpm-eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff7a18;
+  box-shadow: 0 0 8px rgba(255, 122, 24, 0.7);
+  animation: cpm-pulse 2.4s ease-in-out infinite;
+}
+
+.cpm-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #f1f5f9;
+  letter-spacing: -0.4px;
+  margin: 0 0 5px;
+  line-height: 1.2;
+}
+
+.cpm-subtitle {
+  font-size: 13px;
+  color: #334155;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+/* Close button */
+.cpm-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  transition: transform 0.25s ease, background 0.2s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.cpm-close:hover {
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  transform: rotate(90deg) scale(1.05);
+}
+
+/* ── Banner error ─────────────────────────────────────────────── */
+.cpm-banner-error {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 20px 28px 0;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(248, 113, 113, 0.22);
+  background: rgba(248, 113, 113, 0.07);
+  color: #fca5a5;
+  font-size: 12.5px;
+  animation: cpm-error-in 0.22s ease both;
+}
+
+/* ── Form ─────────────────────────────────────────────────────── */
+.cpm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 28px 8px;
+}
+
+/* ── Floating label field ─────────────────────────────────────── */
+.cpm-field {
+  position: relative;
+}
+
+/* The label floats on focus OR when input has value */
+.cpm-label {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13.5px;
+  color: #475569;
+  pointer-events: none;
+  transition:
+    top       0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    font-size 0.22s ease,
+    color     0.22s ease;
+  background: transparent;
+  padding: 0 3px;
+}
+
+/* For textarea, anchor label to top */
+.cpm-field:has(.cpm-textarea) .cpm-label {
+  top: 16px;
+  transform: none;
+}
+
+/* Float up when focused */
+.cpm-input:focus ~ .cpm-label,
+.cpm-input--filled ~ .cpm-label {
+  top: 0;
+  transform: translateY(-50%);
+  font-size: 10.5px;
+  color: #ff7a18;
+  background: #0a0c14;
+  padding: 0 4px;
+}
+
+/* For textarea variant */
+.cpm-field:has(.cpm-textarea) .cpm-input:focus ~ .cpm-label,
+.cpm-field:has(.cpm-textarea) .cpm-input--filled ~ .cpm-label {
+  top: -7px;
+  transform: none;
+}
+
+/* ── Input base ───────────────────────────────────────────────── */
+.cpm-input {
+  width: 100%;
+  padding: 14px 14px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+  color: #e2e8f0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  transition:
+    border-color  0.22s ease,
+    background    0.22s ease,
+    box-shadow    0.22s ease;
+  -webkit-appearance: none;
+}
+
+.cpm-input::placeholder { color: transparent; } /* hidden — label does the job */
+
+.cpm-input:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cpm-input:focus {
+  border-color: rgba(255, 122, 24, 0.55);
+  background: rgba(255, 122, 24, 0.03);
+  box-shadow:
+    0 0 0 3px rgba(255, 122, 24, 0.1),
+    0 0 16px rgba(255, 122, 24, 0.06);
+}
+
+/* Error state */
+.cpm-input--error {
+  border-color: rgba(248, 113, 113, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.08) !important;
+}
+
+.cpm-field--error .cpm-label { color: #fca5a5 !important; }
+
+/* Textarea */
+.cpm-textarea {
+  resize: none;
+  height: 96px;
+  padding-top: 18px;
+  line-height: 1.6;
+}
+
+/* Error message */
+.cpm-error-msg {
+  font-size: 11.5px;
+  color: #fca5a5;
+  margin: 5px 0 0 4px;
+  animation: cpm-error-in 0.2s ease both;
+}
+
+/* ── Budget range row ─────────────────────────────────────────── */
+/* Two side-by-side inputs + a dash divider */
+.cpm-budget-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;         /* align tops so error msgs don't push dash */
+  gap: 10px;
+}
+
+.cpm-budget-dash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;               /* match input height */
+  color: #2d3748;
+  font-size: 16px;
+  font-weight: 300;
+  flex-shrink: 0;
+  user-select: none;
+  padding-top: 0;             /* optically centred to input mid-point */
+}
+
+/* ── Budget wrapper ───────────────────────────────────────────── */
+.cpm-budget-wrap {
+  position: relative;
+}
+
+/* ₹ symbol */
+.cpm-currency {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  color: #334155;
+  pointer-events: none;
+  z-index: 1;
+  transition: color 0.22s ease;
+}
+
+.cpm-budget-wrap:has(.cpm-input:focus) .cpm-currency { color: #ff7a18; }
+
+/* Input inside budget wrap — label is a sibling of wrap, not input */
+.cpm-budget-input {
+  padding-left: 26px;         /* room for ₹ */
+}
+
+/* Floating label inside .cpm-budget-wrap */
+.cpm-budget-wrap .cpm-label {
+  left: 26px;                 /* start after ₹ */
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  background: transparent;
+}
+
+/* Float up on focus / filled */
+.cpm-budget-wrap .cpm-input:focus ~ .cpm-label,
+.cpm-budget-wrap .cpm-input--filled ~ .cpm-label {
+  top: 0;
+  left: 10px;                 /* reset to left edge when floating */
+  transform: translateY(-50%);
+  font-size: 10.5px;
+  color: #ff7a18;
+  background: #0a0c14;
+  padding: 0 4px;
+}
+
+/* Remove number spinner arrows */
+.cpm-budget-input::-webkit-inner-spin-button,
+.cpm-budget-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.cpm-budget-input { -moz-appearance: textfield; }
+
+/* ── Range validation error (below the row) ──────────────────── */
+.cpm-range-error {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: -10px;          /* pull up, closer to the row */
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVE — stack budget inputs on small screens
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 420px) {
+  .cpm-budget-row {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .cpm-budget-dash { display: none; }
+}
+
+/* ── Actions ──────────────────────────────────────────────────── */
+.cpm-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 20px 28px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  margin-top: 8px;
+}
+
+/* Cancel */
+.cpm-cancel {
+  padding: 10px 20px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: #475569;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.cpm-cancel:hover {
+  color: #94a3b8;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cpm-cancel:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Create CTA */
+.cpm-create {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 9px;
+  border: none;
+  background: linear-gradient(135deg, #ff7a18 0%, #ff9a45 100%);
+  color: #0a0506;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.1px;
+  overflow: hidden;
+
+  box-shadow:
+    0 0 20px rgba(255, 122, 24, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+
+  transition:
+    transform   0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow  0.2s ease,
+    opacity     0.2s ease;
+}
+
+.cpm-create:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 32px rgba(255, 122, 24, 0.55),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.cpm-create:active {
+  transform: scale(0.97) translateY(0);
+  box-shadow:
+    0 0 12px rgba(255, 122, 24, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Dim when empty (but not disabled — still clickable to trigger validation) */
+.cpm-create--dim {
+  opacity: 0.65;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.cpm-create:disabled {
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Diagonal shine sweep on hover */
+.cpm-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.22) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+  transition: transform 0s;
+  pointer-events: none;
+}
+
+.cpm-create:hover .cpm-shine {
+  transform: translateX(100%);
+  transition: transform 0.45s ease;
+}
+
+/* Loading spinner */
+.cpm-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0, 0, 0, 0.3);
+  border-top-color: #0a0506;
+  border-radius: 50%;
+  animation: cpm-spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   KEYFRAMES
+   ════════════════════════════════════════════════════════════════ */
+@keyframes cpm-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes cpm-overlay-out {
+  to { opacity: 0; }
+}
+
+@keyframes cpm-modal-in {
+  from { opacity: 0; transform: scale(0.94) translateY(16px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+@keyframes cpm-modal-out {
+  to { opacity: 0; transform: scale(0.96) translateY(10px); }
+}
+
+@keyframes cpm-error-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cpm-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes cpm-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(255, 122, 24, 0.7); }
+  50%       { opacity: 0.6; box-shadow: 0 0 4px rgba(255, 122, 24, 0.3); }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 520px) {
+  .cpm-modal { border-radius: 16px; }
+  .cpm-header { padding: 22px 20px 0; }
+  .cpm-form   { padding: 20px 20px 8px; }
+  .cpm-actions { padding: 16px 20px 20px; }
+  .cpm-title { font-size: 18px; }
+  .cpm-actions { flex-direction: column-reverse; }
+  .cpm-cancel,
+  .cpm-create { width: 100%; justify-content: center; }
+}
+
+.cpm-field--status .cpm-label,
+.cpm-field--tags .cpm-label {
+  top: 0;
+  transform: translateY(-50%);
+  font-size: 10.5px;
+  color: #64748b;
+  background: #0a0c14;
+  padding: 0 4px;
+}
+
+.cpm-status-group {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.cpm-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: #94a3b8;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.cpm-status-pill:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+}
+
+.cpm-status-pill--active {
+  border-color: rgba(255, 122, 24, 0.45);
+  background: linear-gradient(180deg, rgba(255, 122, 24, 0.18), rgba(255, 122, 24, 0.08));
+  color: #ffe2cc;
+  box-shadow:
+    0 0 0 1px rgba(255, 122, 24, 0.16),
+    0 0 18px rgba(255, 122, 24, 0.12);
+}
+
+.cpm-status-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.45;
+  transition: opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cpm-status-pill--active .cpm-status-pill-dot {
+  opacity: 1;
+  box-shadow: 0 0 10px rgba(255, 122, 24, 0.4);
+}
+
+.cpm-tags-wrap {
+  min-height: 54px;
+  padding: 16px 14px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+  transition:
+    border-color 0.22s ease,
+    background 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.cpm-tags-wrap:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cpm-tags-wrap:focus-within {
+  border-color: rgba(255, 122, 24, 0.55);
+  background: rgba(255, 122, 24, 0.03);
+  box-shadow:
+    0 0 0 3px rgba(255, 122, 24, 0.1),
+    0 0 16px rgba(255, 122, 24, 0.06);
+}
+
+.cpm-tags-wrap--error {
+  border-color: rgba(248, 113, 113, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.08) !important;
+}
+
+.cpm-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.cpm-tags-input {
+  flex: 1 1 120px;
+  min-width: 120px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #e2e8f0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 14px;
+  outline: none;
+}
+
+.cpm-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 122, 24, 0.18);
+  background: rgba(255, 122, 24, 0.11);
+  color: #ffd5b4;
+  animation: cpm-chip-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cpm-tag-chip-text {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.cpm-tag-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.cpm-tag-chip-remove:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: scale(1.08);
+}
+
+@keyframes cpm-chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 520px) {
+  .cpm-status-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ─────────────────────────────────────────────
+   DATE INPUT — DARK GLASSMORPHISM WRAPPER
+   ───────────────────────────────────────────── */
+
+.cpm-field {
+  overflow: visible;
+  min-width: 0;
+}
+
+.cpm-field--date .cpm-label {
+  top: 0;
+  transform: translateY(-50%);
+  font-size: 10.5px;
+  color: #64748b;
+  background: #0a0c14;
+  padding: 0 4px;
+}
+
+.cpm-field--date:has(.cpm-date-input:focus) .cpm-label,
+.cpm-field--date .cpm-date-input.cpm-input--filled ~ .cpm-label {
+  color: #ff7a18;
+}
+
+.cpm-date-wrap {
+  position: relative;
+  isolation: isolate;
+}
+
+.cpm-date-input {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  z-index: 1;
+  padding: 20px 52px 12px 14px;
+  color: transparent;
+  caret-color: transparent;
+}
+
+.cpm-date-input::-webkit-datetime-edit,
+.cpm-date-input::-webkit-datetime-edit-fields-wrapper,
+.cpm-date-input::-webkit-datetime-edit-text,
+.cpm-date-input::-webkit-datetime-edit-month-field,
+.cpm-date-input::-webkit-datetime-edit-day-field,
+.cpm-date-input::-webkit-datetime-edit-year-field {
+  color: transparent;
+}
+
+.cpm-date-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.cpm-date-value {
+  position: absolute;
+  left: 14px;
+  right: 54px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.2;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.22s ease, transform 0.22s ease;
+}
+
+.cpm-date-value--filled {
+  color: #e2e8f0;
+}
+
+.cpm-date-wrap:has(.cpm-date-input:focus) .cpm-date-value {
+  color: #f8fafc;
+}
+
+.cpm-date-trigger {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  cursor: pointer;
+  transition:
+    color 0.22s ease,
+    border-color 0.22s ease,
+    background 0.22s ease,
+    transform 0.22s ease,
+    box-shadow 0.22s ease;
+}
+
+.cpm-date-trigger:hover {
+  color: #ffb36f;
+  border-color: rgba(255, 122, 24, 0.26);
+  background: rgba(255, 122, 24, 0.08);
+}
+
+.cpm-date-wrap:has(.cpm-date-input:focus) .cpm-date-trigger {
+  color: #ff7a18;
+  border-color: rgba(255, 122, 24, 0.34);
+  background: rgba(255, 122, 24, 0.1);
+  box-shadow: 0 0 0 3px rgba(255, 122, 24, 0.08);
+}
+
+.cpm-date-wrap:has(.cpm-date-input:focus) .cpm-date-trigger:hover {
+  transform: translateY(-50%) scale(1.02);
+}
