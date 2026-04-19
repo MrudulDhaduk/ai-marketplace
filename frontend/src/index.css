@@ -30,3 +30,13 @@ code {
 
   --violet: #8B5CF6;
 }
+
+.client-theme {
+  --cyan: #ff7a18;
+  --cyan-dim: rgba(255, 122, 24, 0.12);
+  --cyan-glow: rgba(255, 122, 24, 0.35);
+
+  /* optional polish */
+  --violet: #ffb347;
+  --bg: rgba(10,11,16,0.88);
+}

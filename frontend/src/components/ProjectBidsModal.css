@@ -1,0 +1,408 @@
+/* ===== Modal Layout ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  background: rgba(10, 10, 10, 0.65);
+  backdrop-filter: blur(6px);
+  animation: fadeIn 0.25s ease;
+}
+
+.modal-content {
+  position: relative;
+  isolation: isolate;
+
+  width: 520px;
+  max-width: 90%;
+  max-height: 85vh;
+  box-sizing: border-box;
+
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px color-mix(in srgb, var(--cyan) 20%, transparent);
+
+  animation: scaleIn 0.25s ease;
+}
+
+/* Subtle ambient sweep (kept lightweight) */
+.modal-content::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.75;
+  background:
+    radial-gradient(120% 80% at 20% 0%, color-mix(in srgb, var(--cyan-glow) 10%, transparent), transparent 60%),
+    radial-gradient(120% 80% at 110% 110%, color-mix(in srgb, var(--cyan) 7%, transparent), transparent 58%);
+  filter: blur(18px);
+  animation: modal-aurora 7.5s ease-in-out infinite;
+}
+
+.modal-content::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.65;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.05) 14%,
+    transparent 28%
+  );
+  transform: translateX(-35%) skewX(-12deg);
+  mix-blend-mode: screen;
+  animation: modal-sweep 6.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.modal-content h2 {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+/* ===== Bid Cards ===== */
+.bid-card {
+  position: relative;
+  isolation: isolate;
+  max-width: 100%;
+  margin-bottom: 12px;
+  padding: 14px 14px 13px;
+  border-radius: 16px;
+
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface) 76%, transparent),
+      color-mix(in srgb, var(--bg) 70%, transparent)
+    ),
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--cyan) 6%, transparent) 45%,
+      transparent 100%
+    );
+  background-size: 100% 100%, 240% 100%;
+  background-position: 0 0, 0% 0;
+
+  border: 1px solid color-mix(in srgb, var(--cyan) 20%, rgba(255, 255, 255, 0.06));
+  box-shadow:
+    0 18px 46px rgba(0, 0, 0, 0.55),
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 0 0 1px color-mix(in srgb, var(--cyan-dim) 10%, transparent);
+
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  transform-style: preserve-3d;
+  perspective: 900px;
+
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.24s ease,
+    background-position 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.28s ease;
+
+  animation:
+    bid-card-in 0.46s cubic-bezier(0.2, 0.95, 0.25, 1.12) both,
+    bid-landing 0.62s cubic-bezier(0.22, 1, 0.36, 1) both,
+    bid-idle-breathe 3.8s ease-in-out 0.8s infinite;
+}
+
+.bid-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.65;
+  background:
+    radial-gradient(120% 120% at 18% 0%, color-mix(in srgb, var(--cyan-glow) 24%, transparent), transparent 62%),
+    radial-gradient(120% 120% at 110% 120%, color-mix(in srgb, var(--cyan) 14%, transparent), transparent 60%);
+  filter: blur(10px);
+  transition: opacity 0.28s ease, filter 0.28s ease;
+  animation: card-glow-breathe 4.6s ease-in-out infinite;
+}
+
+.bid-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.08) 16%, transparent 32%),
+    radial-gradient(80% 60% at 30% 10%, rgba(255, 255, 255, 0.06), transparent 62%);
+  transform: translateX(-18%) skewX(-10deg);
+  mix-blend-mode: screen;
+  transition: opacity 0.25s ease;
+}
+
+.bid-card:hover {
+  transform:
+    translateY(-5px)
+    scale(1.015)
+    perspective(900px)
+    rotateX(2.2deg)
+    rotateY(-2.6deg);
+
+  background-position: 0 0, 100% 0;
+  border-color: color-mix(in srgb, var(--cyan) 48%, rgba(255, 255, 255, 0.12));
+  box-shadow:
+    0 26px 68px rgba(0, 0, 0, 0.62),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 0 0 1px color-mix(in srgb, var(--cyan) 22%, transparent),
+    0 0 26px color-mix(in srgb, var(--cyan-glow) 32%, transparent);
+  filter: saturate(1.04);
+}
+
+.bid-card:hover::before {
+  opacity: 0.95;
+  filter: blur(12px);
+  animation:
+    card-glow-breathe 2.8s ease-in-out infinite,
+    card-glow-drift 1.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.bid-card:hover::after {
+  opacity: 0.9;
+  animation:
+    bid-shine 1.1s cubic-bezier(0.22, 1, 0.36, 1) both,
+    card-reflect-drift 1.35s ease-in-out infinite;
+}
+
+.bid-card:active {
+  transform: translateY(-2px) scale(1.006);
+}
+
+.bid-card h4 {
+  max-width: 100%;
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.bid-card p {
+  max-width: 100%;
+  margin: 4px 0;
+  font-size: 13px;
+  opacity: 0.85;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Amount */
+.bid-card p:nth-of-type(2) {
+  font-weight: 600;
+  color: var(--cyan);
+  animation: amount-flicker 6.2s ease-in-out infinite;
+}
+
+/* Status */
+.bid-card p:nth-of-type(3) {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* ===== Buttons ===== */
+.bid-card button {
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--cyan);
+  color: #000;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bid-card button:hover {
+  background: var(--cyan-glow);
+  transform: scale(1.05);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--cyan-glow) 26%, transparent);
+}
+
+.bid-card button:active {
+  transform: scale(1.02);
+}
+
+.modal-content > button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid var(--cyan-dim);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.modal-content > button:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  transform: translateY(-1px);
+}
+
+.modal-content > button:active {
+  transform: translateY(0);
+}
+
+/* ===== Scrollbar ===== */
+.modal-content {
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: var(--cyan) transparent;
+}
+
+.modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--bg) 35%, transparent);
+  border-radius: 999px;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--cyan) 32%, transparent),
+    color-mix(in srgb, var(--cyan-glow) 26%, transparent)
+  );
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--cyan) 18%, transparent),
+    0 0 14px color-mix(in srgb, var(--cyan-glow) 18%, transparent);
+  opacity: 0.55;
+  transition: opacity 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.modal-content:hover::-webkit-scrollbar-thumb {
+  opacity: 0.92;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--cyan) 46%, transparent),
+    color-mix(in srgb, var(--cyan-glow) 38%, transparent)
+  );
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--cyan) 26%, transparent),
+    0 0 22px color-mix(in srgb, var(--cyan-glow) 26%, transparent);
+}
+
+/* ===== Animations ===== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes modal-aurora {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.7; }
+  50% { transform: translateY(-6px) scale(1.02); opacity: 0.88; }
+}
+
+@keyframes modal-sweep {
+  0% { transform: translateX(-45%) skewX(-12deg); opacity: 0; }
+  18% { opacity: 0.75; }
+  52% { opacity: 0.35; }
+  100% { transform: translateX(45%) skewX(-12deg); opacity: 0; }
+}
+
+@keyframes bid-card-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes bid-landing {
+  0% { filter: blur(6px); transform: translateY(14px) scale(0.98); }
+  70% { filter: blur(0.5px); transform: translateY(-2px) scale(1.01); }
+  100% { filter: blur(0px); transform: translateY(0) scale(1); }
+}
+
+@keyframes bid-idle-breathe {
+  0%, 100% {
+    box-shadow:
+      0 18px 46px rgba(0, 0, 0, 0.55),
+      0 1px 0 rgba(255, 255, 255, 0.06) inset,
+      0 0 0 1px color-mix(in srgb, var(--cyan-dim) 10%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 20px 52px rgba(0, 0, 0, 0.58),
+      0 1px 0 rgba(255, 255, 255, 0.06) inset,
+      0 0 0 1px color-mix(in srgb, var(--cyan) 12%, transparent),
+      0 0 18px color-mix(in srgb, var(--cyan-glow) 14%, transparent);
+  }
+}
+
+@keyframes card-glow-breathe {
+  0%, 100% { opacity: 0.58; filter: blur(10px); }
+  50% { opacity: 0.82; filter: blur(12px); }
+}
+
+@keyframes card-glow-drift {
+  0% { background-position: 0% 0%, 100% 100%; }
+  100% { background-position: 100% 0%, 0% 100%; }
+}
+
+@keyframes bid-shine {
+  from { transform: translateX(-24%) skewX(-10deg); }
+  to { transform: translateX(52%) skewX(-10deg); }
+}
+
+@keyframes card-reflect-drift {
+  0%, 100% { transform: translateX(-10%) skewX(-10deg); }
+  50% { transform: translateX(10%) skewX(-10deg); }
+}
+
+@keyframes amount-flicker {
+  0%, 100% { opacity: 1; }
+  48% { opacity: 0.94; }
+  50% { opacity: 1; }
+  52% { opacity: 0.97; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay,
+  .modal-content,
+  .modal-content::before,
+  .modal-content::after,
+  .bid-card,
+  .bid-card::before,
+  .bid-card::after,
+  .bid-card p:nth-of-type(2) {
+    animation: none !important;
+  }
+  .bid-card,
+  .bid-card button,
+  .modal-content > button {
+    transition: none !important;
+  }
+}

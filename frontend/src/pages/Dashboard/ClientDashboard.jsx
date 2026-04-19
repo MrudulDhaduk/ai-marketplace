@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import "./ClientDashboard.css";
 import CreateProjectModal from "../../components/CreateProjectModal";
-
+import TopBar from "../../components/TopBar";
+import ProjectBidsModal from "../../components/ProjectBidsModal";
 /* ═══════════════════════════════════════════════════
    DATA
 ═══════════════════════════════════════════════════ */
@@ -73,7 +74,7 @@ const FEED = [
   },
 ];
 
-const TABS = ["All", "Active", "Review", "Draft", "Completed"];
+const TABS = ["All", "Bidding", "Active", "Completed", "Draft"];
 
 function formatProjectForCard(p) {
   const hasBudgetText = typeof p.budget === "string" && p.budget.trim();
@@ -84,15 +85,14 @@ function formatProjectForCard(p) {
   const hasDueText = typeof p.due === "string" && p.due.trim();
   const dueSource = p.due_date ?? p.dueDate ?? null;
   const parsedDueDate = dueSource ? new Date(dueSource) : null;
-  const due =
-    hasDueText
-      ? p.due
-      : parsedDueDate && !Number.isNaN(parsedDueDate.getTime())
-        ? parsedDueDate.toLocaleDateString("en-IN", {
-            day: "numeric",
-            month: "short",
-          })
-        : "No deadline";
+  const due = hasDueText
+    ? p.due
+    : parsedDueDate && !Number.isNaN(parsedDueDate.getTime())
+      ? parsedDueDate.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+        })
+      : "No deadline";
 
   return {
     ...p,
@@ -582,7 +582,7 @@ const S_CFG = {
   completed: { cls: "status-completed", label: "Completed" },
 };
 
-function ProjectCard({ p, idx }) {
+function ProjectCard({ p, idx, onView }) {
   const ref = useRef(null);
   const tilt = useTilt(ref, 5);
   const cfg = S_CFG[p.status] || S_CFG.draft;
@@ -625,7 +625,11 @@ function ProjectCard({ p, idx }) {
             </span>
           ))}
         </div>
-        <button className="pc-view" data-ripple="">
+        <button
+          className="pc-view"
+          data-ripple=""
+          onClick={() => onView(p)}
+        >
           View →
         </button>
       </div>
@@ -637,7 +641,7 @@ function ProjectCard({ p, idx }) {
 /* ═══════════════════════════════════════════════════
    PROJECTS PANEL
 ═══════════════════════════════════════════════════ */
-function ProjectsPanel({ projects, onTabChange }) {
+function ProjectsPanel({ projects, onTabChange, onViewProject }) {
   const [tab, setTab] = useState("All");
   const [animOut, setAnimOut] = useState(false);
   const [rendered, setRendered] = useState("All");
@@ -684,7 +688,14 @@ function ProjectsPanel({ projects, onTabChange }) {
       </div>
       <div className={`pp-grid${animOut ? " pp-grid--out" : ""}`}>
         {list.length ? (
-          list.map((p, i) => <ProjectCard key={p.id ?? i} p={p} idx={i} />)
+          list.map((p, i) => (
+            <ProjectCard
+              key={p.id ?? i}
+              p={p}
+              idx={i}
+              onView={onViewProject}
+            />
+          ))
         ) : (
           <div className="pp-empty">No projects yet</div>
         )}
@@ -739,6 +750,9 @@ export default function ClientDashboard() {
   const mousePos = useMousePos();
   const shellRef = useRef(null);
 
+  // Step 1: Add selectedProject state
+  const [selectedProject, setSelectedProject] = useState(null);
+
   useRipple(shellRef);
 
   const handleNewProject = (project) => {
@@ -768,7 +782,7 @@ export default function ClientDashboard() {
         setProjects(
           Array.isArray(data)
             ? data.map((project) => formatProjectForCard(project))
-            : []
+            : [],
         );
       } catch (error) {
         if (error.name !== "AbortError") {
@@ -814,32 +828,49 @@ export default function ClientDashboard() {
         - no overflow:hidden (would clip fixed children)
         - carries theme class for CSS variable scoping
     */
-    <div
-      ref={shellRef}
-      className={`db-shell${light ? " db-shell--light" : ""}`}
-    >
-      <Background light={light} mousePos={mousePos} tabTone={tabTone} />
-      <Sidebar user={user} />
-      <div className="db-main">
-        <DashHeader user={user} onCreateProject={handleNewProject} />
-        <div className="stats-row">
-          {STATS.map((s, i) => (
-            <StatCard key={s.id} stat={s} idx={i} />
-          ))}
-        </div>
-        <div className="db-body">
-          <ProjectsPanel projects={projects} onTabChange={setTabTone} />
-          <ActivityFeed />
-        </div>
+    <div>
+      <div className="client-theme">
+        <TopBar />
       </div>
-      <button
-        className="theme-toggle"
-        onClick={() => setLight((v) => !v)}
-        title={light ? "Switch to dark" : "Switch to light"}
-        aria-label={light ? "Switch to dark" : "Switch to light"}
+      <div
+        ref={shellRef}
+        className={`db-shell${light ? " db-shell--light" : ""}`}
       >
-        {light ? "🌙" : "☀️"}
-      </button>
+        <Background light={light} mousePos={mousePos} tabTone={tabTone} />
+        <Sidebar user={user} />
+        <div className="db-main">
+          <DashHeader user={user} onCreateProject={handleNewProject} />
+          <div className="stats-row">
+            {STATS.map((s, i) => (
+              <StatCard key={s.id} stat={s} idx={i} />
+            ))}
+          </div>
+          <div className="db-body">
+            <ProjectsPanel
+              projects={projects}
+              onTabChange={setTabTone}
+              onViewProject={(project) => setSelectedProject(project)}
+            />
+            <ActivityFeed />
+          </div>
+        </div>
+        <button
+          className="theme-toggle"
+          onClick={() => setLight((v) => !v)}
+          title={light ? "Switch to dark" : "Switch to light"}
+          aria-label={light ? "Switch to dark" : "Switch to light"}
+        >
+          {light ? "🌙" : "☀️"}
+        </button>
+        {selectedProject && (
+          <div className="client-theme">
+          <ProjectBidsModal 
+            project={selectedProject}
+            onClose={() => setSelectedProject(null)}
+          />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

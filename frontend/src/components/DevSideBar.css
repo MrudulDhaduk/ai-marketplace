@@ -1,0 +1,181 @@
+.dd-sidebar {
+  position: fixed;
+  top: var(--navbar-h);
+  left: 0;
+  bottom: 0;
+  width: var(--sb-w);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0 16px;
+  background: rgba(8, 12, 24, 0.88);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid var(--border);
+  transition: width 0.3s var(--expo);
+  overflow: hidden;
+}
+
+.dd-sidebar--open {
+  width: var(--sb-open-w);
+}
+
+.dd-sb-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  margin-bottom: 28px;
+  flex-shrink: 0;
+}
+
+.dd-sb-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  color: #fff;
+  box-shadow: 0 4px 16px var(--cyan-glow);
+}
+
+.dd-sb-wordmark {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.dd-sidebar--open .dd-sb-wordmark {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.dd-sb-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 8px;
+  flex: 1;
+}
+
+.dd-sb-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font-family: "Manrope", sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.18s ease, color 0.18s ease;
+  width: 100%;
+}
+
+.dd-sb-item:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.dd-sb-item--on {
+  background: var(--cyan-dim);
+  color: var(--cyan);
+}
+
+.dd-sb-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dd-sb-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.dd-sb-label {
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 0.2s ease 0.04s, transform 0.2s ease 0.04s;
+}
+
+.dd-sidebar--open .dd-sb-label {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.dd-sb-pip {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 2px 0 0 2px;
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan-glow);
+}
+
+.dd-sb-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.dd-sb-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--cyan-glow);
+}
+
+.dd-sb-user {
+  opacity: 0;
+  transform: translateX(-6px);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.dd-sidebar--open .dd-sb-user {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.dd-sb-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dd-sb-role {
+  font-size: 11px;
+  color: var(--cyan);
+}

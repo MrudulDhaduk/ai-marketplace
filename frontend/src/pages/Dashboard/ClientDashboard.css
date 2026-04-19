@@ -358,7 +358,7 @@
   z-index:    1;
   flex:       1;
   margin-left: var(--sb-w);
-  padding:    calc(var(--navbar-h) + 28px) 28px 48px;
+  padding:    20px 25px;
   display:    flex;
   flex-direction: column;
   gap:        24px;
@@ -374,6 +374,21 @@
   justify-content: space-between; gap: 20px;
   animation: rise 0.55s var(--expo) both;
 }
+/* -- FLOATING MOTION -- */
+.dash-header,
+.stat-card,
+.pc,
+.feed {
+  animation: float-soft 6s ease-in-out infinite;
+}
+.stat-card { animation-delay: calc(var(--si, 0) * 0.2s); }
+.pc { animation-delay: calc(var(--ci, 0) * 0.18s); }
+.feed { animation-delay: 0.35s; }
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0px);}
+  50%      { transform: translateY(-4px);}
+}
+
 .dash-greeting { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
 .dash-name     { color: var(--orange); }
 .dash-sub      { margin-top: 5px; font-size: 13px; color: var(--text-2); font-weight: 400; }
@@ -387,9 +402,21 @@
   white-space: nowrap; flex-shrink: 0;
   transition: transform 0.25s var(--spring), box-shadow 0.25s ease;
   box-shadow: 0 4px 24px var(--orange-glow);
+  /* -- GLOW PULSE -- */
+  animation: glow-pulse 3s ease-in-out infinite;
 }
-.post-btn:hover  { transform: translateY(-2px) scale(1.02); box-shadow: 0 8px 36px rgba(255,107,43,0.45); }
-.post-btn:active { transform: scale(0.98); }
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 4px 24px var(--orange-glow);}
+  50%      { box-shadow: 0 8px 40px rgba(255,107,43,0.5);}
+}
+.post-btn:hover  { 
+  transform: translateY(-3px) scale(1.03); 
+  box-shadow: 0 8px 36px rgba(255,107,43,0.45);
+}
+.post-btn:active { 
+  transform: translateY(0) scale(0.975);
+}
+.post-btn:active .post-btn-shine { background-position: -260%; }
 .post-btn-icon   { width: 16px; height: 16px; display: flex; align-items: center; }
 .post-btn-shine  {
   position: absolute; inset: 0;
@@ -406,19 +433,64 @@
   display: grid; grid-template-columns: repeat(4,1fr); gap: 12px;
 }
 .stat-card {
-  position: relative; display: flex; align-items: center; gap: 14px;
+  position: relative; 
+  display: flex; align-items: center; gap: 14px;
   padding: 16px 18px; border-radius: 14px;
   background: var(--surface); border: 1px solid var(--border);
   overflow: hidden; cursor: default;
   animation: rise 0.5s var(--expo) both;
   animation-delay: calc(var(--si) * 0.08s);
   transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s var(--spring);
+  isolation: isolate; /* for pseudo border gradient layering */
+  will-change: transform;
 }
-.stat-card:hover { transform: translateY(-3px); }
-.sc-orange:hover { border-color: rgba(255,107,43,0.35); box-shadow: 0 8px 32px rgba(255,107,43,0.1); }
+.stat-card:hover { 
+  /* -- TILT -- */
+  transform: perspective(1000px) rotateX(2deg) rotateY(-2deg) scale(1.02); 
+}
+
+.sc-orange:hover { border-color: rgba(254, 106, 42, 0.35); box-shadow: 0 8px 32px rgba(255,107,43,0.1); }
 .sc-gold:hover   { border-color: rgba(240,164,41,0.35); box-shadow: 0 8px 32px rgba(240,164,41,0.1); }
 .sc-lime:hover   { border-color: rgba(139,202,74,0.35); box-shadow: 0 8px 32px rgba(139,202,74,0.1); }
 .sc-teal:hover   { border-color: rgba(46,196,182,0.35); box-shadow: 0 8px 32px rgba(46,196,182,0.1); }
+
+/* -- Gradient Border -- */
+.stat-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent, var(--orange), transparent);
+  opacity: 0;
+  transition: opacity 0.3s var(--expo);
+  z-index: 2;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+}
+.stat-card:hover::before {
+  opacity: 1;
+}
+/* -- Light sweep effect -- */
+.stat-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, color-mix(in srgb, var(--text) 8%, transparent), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  transition: left 0.6s var(--expo);
+  z-index: 3;
+}
+.stat-card:hover::after {
+  left: 120%;
+}
 
 .sc-icon { width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .sc-icon svg { width: 18px; height: 18px; }
@@ -430,7 +502,14 @@
 .sc-value {
   font-family: 'Fira Code', monospace; font-size: 24px;
   font-weight: 500; letter-spacing: -0.5px; line-height: 1;
+  /* -- GLOW FLICKER -- */
+  text-shadow: 0 0 8px currentColor;
+  transition: text-shadow 0.3s var(--expo);
 }
+.stat-card:hover .sc-value {
+  text-shadow: 0 0 16px currentColor;
+}
+
 .sc-orange .sc-value { color: var(--orange); }
 .sc-gold   .sc-value { color: var(--gold);   }
 .sc-lime   .sc-value { color: var(--lime);   }
@@ -509,9 +588,53 @@
   overflow: hidden; cursor: pointer;
   animation: rise 0.42s var(--expo) both;
   animation-delay: calc(var(--ci) * 0.055s);
-  transition: border-color 0.22s ease, box-shadow 0.22s ease;
+  transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.25s var(--expo);
+  isolation: isolate; /* for pseudo layering */
+  will-change: transform;
 }
-.pc:hover { border-color: var(--border-hi); box-shadow: 0 10px 36px rgba(0,0,0,0.35); }
+.pc:hover { 
+  border-color: var(--border-hi); 
+  box-shadow: 0 10px 36px rgba(0,0,0,0.35); 
+  /* -- premium tilt -- */
+  transform: perspective(1000px) rotateX(2deg) rotateY(-2deg) scale(1.02);
+}
+/* -- Gradient Border -- */
+.pc::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent, var(--orange), transparent);
+  opacity: 0;
+  transition: opacity 0.3s var(--expo);
+  z-index: 2;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+}
+.pc:hover::before {
+  opacity: 1;
+}
+/* -- Light Sweep -- */
+.pc::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, color-mix(in srgb, var(--text) 8%, transparent), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  transition: left 0.6s var(--expo);
+  z-index: 3;
+}
+.pc:hover::after {
+  left: 120%;
+}
 
 .pc-top { display: flex; justify-content: space-between; align-items: center; }
 .pc-cat {
@@ -537,7 +660,15 @@
 .status-draft .status-dot { background: #94a3b8; box-shadow: 0 0 10px rgba(148,163,184,0.25); }
 .status-completed .status-dot { background: var(--lime); box-shadow: 0 0 10px rgba(139,202,74,0.35); }
 
-.pc-title { font-size: 13.5px; font-weight: 600; line-height: 1.35; letter-spacing: -0.15px; color: var(--text); }
+.pc-title { 
+  font-size: 13.5px; 
+  font-weight: 600;
+  line-height: 1.35; 
+  letter-spacing: -0.15px; 
+  color: var(--text);
+  transition: transform 0.25s var(--expo), color 0.25s var(--expo);
+}
+.pc:hover .pc-title { transform: translateX(3px); }
 
 .prog-track { height: 3px; background: var(--surface-3); border-radius: 2px; overflow: hidden; }
 .prog-fill  { height: 100%; border-radius: 2px; transition: width 0.85s var(--expo); }
@@ -554,7 +685,26 @@
 
 .pc-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
 .pc-tags   { display: flex; gap: 5px; flex-wrap: wrap; }
-.pc-tag    { font-size: 10px; padding: 2px 7px; border-radius: 4px; background: var(--surface-3); color: var(--text-2); border: 1px solid var(--border); font-family: 'Fira Code', monospace; }
+/* -- Project tag & micro interaction -- */
+.pc-tag    { 
+  font-size: 10px; 
+  padding: 2px 7px; 
+  border-radius: 4px;
+  background: var(--surface-3); 
+  color: var(--text-2); 
+  border: 1px solid var(--border); 
+  font-family: 'Fira Code', monospace; 
+  transition: 
+    color 0.22s var(--expo),
+    border-color 0.22s var(--expo),
+    box-shadow 0.22s var(--expo);
+}
+.pc-tag:hover {
+  color: var(--orange);
+  border-color: var(--orange);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--orange-glow) 65%, transparent);
+}
+
 .pc-view   {
   padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border-hi);
   background: transparent; color: var(--text-2);
@@ -578,6 +728,7 @@
   border-radius: 14px; overflow: hidden;
   position: sticky; top: calc(var(--navbar-h) + 24px);
   animation: rise 0.55s var(--expo) 0.18s both;
+  will-change: transform;
 }
 .feed-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -600,13 +751,36 @@
   50%     { opacity: 0.55; box-shadow: 0 0 12px var(--lime-glow); }
 }
 .feed-list { list-style: none; padding: 6px 0; }
+/* -- FEED ROW ENHANCED -- */
 .feed-row {
   display: flex; gap: 11px; align-items: flex-start; padding: 9px 15px;
-  cursor: default; transition: background 0.16s ease;
+  cursor: default; 
   animation: slide-in 0.4s var(--expo) both;
   animation-delay: calc(var(--fi) * 0.07s);
+  will-change: transform;
+  transition: 
+    transform 0.25s var(--expo), 
+    background 0.25s var(--expo), 
+    opacity 0.25s var(--expo);
+  /* Adds slide+fade+hover highlight */
 }
-.feed-row:hover { background: var(--surface-3); }
+.feed-row:hover { 
+  background: var(--surface-3); 
+  transform: translateX(4px);
+}
+/* Optionally, a wave can be added for more premium hover:
+.feed-row::after {
+  content: "";
+  position: absolute;
+  left: -60px; top: 0; bottom: 0; width: 80px; pointer-events: none;
+  background: linear-gradient(90deg, rgba(255,107,43,0.11) 0%, transparent 100%);
+  opacity: 0; transition: opacity 0.3s var(--expo);
+}
+.feed-row:hover::after {
+  opacity: 1;
+}
+*/
+
 .feed-pip     { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
 .pip--orange  { background: var(--orange); box-shadow: 0 0 6px var(--orange-glow); }
 .pip--gold    { background: var(--gold);   box-shadow: 0 0 6px var(--gold-glow);   }
@@ -661,4 +835,25 @@
 @media (prefers-reduced-motion: reduce) {
   .bg-orb, .bg-blob, .ripple-wave { animation: none !important; }
   .bg-cursor-orb { transition: none !important; }
+}
+
+/* ════════════════════════════════════════════════════
+   GLOBAL / AMBIENT PREMIUM DYNAMICS
+════════════════════════════════════════════════════ */
+
+/* -- Main content ambient glow layer -- */
+.db-main::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 20% 10%, rgba(255,107,43,0.05), transparent 60%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* -- Add will-change for perf safety -- */
+.stat-card,
+.pc,
+.feed-row {
+  will-change: transform;
 }

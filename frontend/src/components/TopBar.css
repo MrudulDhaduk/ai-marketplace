@@ -14,12 +14,17 @@
   gap:              20px;
   padding:          0 28px;
   height:           65px;
+  width:            100%;
+  min-width:        0;
   background:       color-mix(in srgb, var(--bg) 82%, transparent);
   backdrop-filter:  blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border-bottom:    1px solid var(--border);
   animation:        topbar-rise 0.45s cubic-bezier(0.16,1,0.3,1) both;
 }
+
+/* Optional safety: prevent overflow from padding/borders */
+.topbar * { box-sizing: border-box; }
 
 @keyframes topbar-rise {
   from { opacity: 0; transform: translateY(-8px); }
@@ -62,6 +67,7 @@
   align-items: center;
   gap:         10px;
   flex-shrink: 0;
+  min-width:   0;
 }
 
 /* ── Search ─────────────────────────────────── */
@@ -69,6 +75,7 @@
   position:    relative;
   display:     flex;
   align-items: center;
+  flex:        0 0 auto;
   background:  var(--surface);
   border:      1px solid var(--border);
   border-radius: 9px;
@@ -106,6 +113,8 @@
   font-size:   13.5px;
   font-weight: 400;
   width:       210px;
+  min-width:   140px;
+  max-width:   220px;
   outline:     none;
   line-height: 1;
 }
@@ -388,4 +397,407 @@
 .topbar-count strong {
   color: var(--cyan);
   font-weight: 600;
+}
+
+/* ════════════════════════════════════════════════
+   ENHANCEMENTS (Ultra premium motion + surface)
+   - Extends existing styles (no layout changes)
+   - Keeps animations subtle + performant
+════════════════════════════════════════════════ */
+
+/* ===== Global Motion System ===== */
+.topbar,
+.topbar-search,
+.topbar-icon-btn,
+.topbar-avatar-btn,
+.topbar-dropdown,
+.topbar-drop-item {
+  --ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Slight floating + ambient pulse (very low intensity) */
+.topbar {
+  transform: translateZ(0);
+  animation:
+    topbar-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both,
+    topbar-float 4.8s var(--ease-premium) 0.7s infinite,
+    topbar-ambient 6.6s ease-in-out 0.9s infinite;
+}
+
+/* Topbar surface upgrade: moving gradient overlay + faint sweep */
+.topbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      140% 120% at 18% 0%,
+      color-mix(in srgb, var(--cyan-glow) 10%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      120% 100% at 110% 120%,
+      color-mix(in srgb, var(--cyan) 7%, transparent),
+      transparent 55%
+    );
+  opacity: 0.55;
+  filter: blur(14px);
+  animation: topbar-glow-drift 10s ease-in-out infinite;
+}
+
+.topbar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    color-mix(in srgb, var(--text) 7%, transparent) 14%,
+    transparent 28%
+  );
+  opacity: 0.25;
+  transform: translateX(-45%) skewX(-12deg);
+  mix-blend-mode: screen;
+  animation: topbar-sweep 7.2s var(--ease-premium) infinite;
+}
+
+/* Ensure pseudo-elements render */
+.topbar {
+  position: sticky;
+}
+
+/* ===== Search Bar (Premium) ===== */
+.topbar-search {
+  overflow: hidden;
+  transition:
+    border-color 0.22s var(--ease-premium),
+    box-shadow 0.22s var(--ease-premium),
+    transform 0.22s var(--ease-premium);
+}
+
+.topbar-search::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    120deg,
+    transparent 20%,
+    color-mix(in srgb, var(--cyan) 18%, transparent) 45%,
+    transparent 70%
+  );
+  opacity: 0;
+  transform: translateX(-30%) skewX(-10deg);
+  transition: opacity 0.22s var(--ease-premium);
+}
+
+.topbar-search--focus {
+  transform: scale(1.015);
+}
+
+.topbar-search--focus::before {
+  opacity: 1;
+  animation: search-border-sweep 1.8s var(--ease-premium) infinite;
+}
+
+.topbar-search-input::placeholder {
+  opacity: 0.9;
+  transition: opacity 0.22s var(--ease-premium);
+}
+
+.topbar-search--focus .topbar-search-input::placeholder {
+  opacity: 0.45;
+}
+
+.topbar-search-icon {
+  transition:
+    color 0.22s var(--ease-premium),
+    filter 0.22s var(--ease-premium);
+}
+
+.topbar-search--focus .topbar-search-icon {
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--cyan-glow) 25%, transparent));
+  animation: icon-breathe 2.6s ease-in-out infinite;
+}
+
+/* ===== Notification Bell (Alive) ===== */
+.topbar-icon-btn {
+  transition:
+    transform 0.22s var(--ease-premium),
+    box-shadow 0.22s var(--ease-premium),
+    background 0.22s var(--ease-premium),
+    border-color 0.22s var(--ease-premium),
+    color 0.22s var(--ease-premium);
+  animation: bell-idle 4.2s ease-in-out infinite;
+}
+
+.topbar-icon-btn:hover {
+  transform: translateY(-2px) rotate(-2deg);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--cyan) 14%, transparent),
+    0 0 16px color-mix(in srgb, var(--cyan-glow) 16%, transparent);
+}
+
+/* Shake when count badge exists (best-effort CSS trigger) */
+.topbar-icon-btn:has(.topbar-notif-count) svg {
+  animation: bell-shake 0.55s var(--ease-premium);
+  transform-origin: 50% 10%;
+}
+
+/* Count badge (new JSX) — minimal now, premium CSS later */
+.topbar-notif-count {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cyan) 28%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--cyan) 14%, transparent),
+    0 0 18px color-mix(in srgb, var(--cyan-glow) 14%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: badge-pop 0.28s var(--ease-premium);
+}
+
+/* ===== Notification Dot (Ripple + Aura) ===== */
+.topbar-notif-dot {
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--cyan-glow) 35%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--cyan) 18%, transparent);
+}
+
+.topbar-notif-dot::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 26%, transparent);
+  opacity: 0.55;
+  transform: scale(0.7);
+  animation: notif-ring 1.9s ease-out infinite;
+}
+
+/* ===== Profile Button ===== */
+.topbar-avatar-btn {
+  transition:
+    transform 0.22s var(--ease-premium),
+    box-shadow 0.22s var(--ease-premium),
+    border-color 0.22s var(--ease-premium),
+    background 0.22s var(--ease-premium),
+    color 0.22s var(--ease-premium);
+}
+
+.topbar-avatar-btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--cyan) 14%, transparent),
+    0 0 18px color-mix(in srgb, var(--cyan-glow) 12%, transparent);
+}
+
+.topbar-avatar {
+  animation: avatar-breathe 4.4s ease-in-out infinite;
+}
+
+.topbar-avatar-btn--open {
+  transform: translateY(-1px) scale(1.01);
+}
+
+/* ===== Dropdown (Alive + Stagger) ===== */
+.topbar-dropdown {
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--cyan) 10%, transparent),
+    0 18px 48px color-mix(in srgb, var(--surface) 45%, transparent);
+  animation: drop-in 0.24s var(--ease-premium) both;
+}
+
+.topbar-drop-item {
+  position: relative;
+  overflow: hidden;
+  transition:
+    background 0.18s var(--ease-premium),
+    color 0.18s var(--ease-premium),
+    transform 0.18s var(--ease-premium),
+    box-shadow 0.18s var(--ease-premium);
+}
+
+/* Stagger (best-effort) */
+.topbar-dropdown .topbar-drop-item {
+  animation: item-in 0.26s var(--ease-premium) both;
+}
+.topbar-dropdown .topbar-drop-item:nth-of-type(1) { animation-delay: 0.03s; }
+.topbar-dropdown .topbar-drop-item:nth-of-type(2) { animation-delay: 0.06s; }
+.topbar-dropdown .topbar-drop-item:nth-of-type(3) { animation-delay: 0.09s; }
+.topbar-dropdown .topbar-drop-item:nth-of-type(4) { animation-delay: 0.12s; }
+
+.topbar-drop-item::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    circle at 30% 40%,
+    color-mix(in srgb, var(--cyan-glow) 18%, transparent),
+    transparent 55%
+  );
+  transform: scale(0.9);
+  transition: opacity 0.18s var(--ease-premium), transform 0.18s var(--ease-premium);
+}
+
+.topbar-drop-item:hover::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ===== Notifications Dropdown (new JSX) ===== */
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 120;
+  width: min(320px, 72vw);
+  padding: 8px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cyan) 18%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--cyan) 10%, transparent),
+    0 18px 48px color-mix(in srgb, var(--surface) 45%, transparent);
+  transform-origin: top right;
+  animation: drop-in 0.24s var(--ease-premium) both;
+}
+
+.notif-empty {
+  margin: 6px 8px;
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--text) 72%, transparent);
+}
+
+.notif-item {
+  padding: 10px 10px;
+  border-radius: 10px;
+  color: color-mix(in srgb, var(--text) 86%, transparent);
+  font-size: 13px;
+  line-height: 1.35;
+  transition:
+    transform 0.18s var(--ease-premium),
+    background 0.18s var(--ease-premium),
+    box-shadow 0.18s var(--ease-premium);
+  animation: item-in 0.26s var(--ease-premium) both;
+}
+
+.notif-item:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--cyan) 10%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--cyan-glow) 12%, transparent);
+}
+
+/* ===== Animations ===== */
+@keyframes topbar-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+
+@keyframes topbar-ambient {
+  0%, 100% { filter: saturate(1); }
+  50% { filter: saturate(1.04); }
+}
+
+@keyframes topbar-glow-drift {
+  0%, 100% { opacity: 0.45; transform: translateY(0); }
+  50% { opacity: 0.65; transform: translateY(-4px); }
+}
+
+@keyframes topbar-sweep {
+  0% { transform: translateX(-48%) skewX(-12deg); opacity: 0; }
+  18% { opacity: 0.28; }
+  52% { opacity: 0.16; }
+  100% { transform: translateX(48%) skewX(-12deg); opacity: 0; }
+}
+
+@keyframes search-border-sweep {
+  0% { transform: translateX(-40%) skewX(-10deg); }
+  100% { transform: translateX(40%) skewX(-10deg); }
+}
+
+@keyframes icon-breathe {
+  0%, 100% { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--cyan-glow) 18%, transparent)); }
+  50% { filter: drop-shadow(0 0 14px color-mix(in srgb, var(--cyan-glow) 28%, transparent)); }
+}
+
+@keyframes bell-idle {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 14px color-mix(in srgb, var(--cyan-glow) 8%, transparent); }
+}
+
+@keyframes bell-shake {
+  0% { transform: rotate(0deg); }
+  20% { transform: rotate(-12deg); }
+  40% { transform: rotate(10deg); }
+  60% { transform: rotate(-8deg); }
+  80% { transform: rotate(6deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes notif-ring {
+  0% { transform: scale(0.7); opacity: 0.55; }
+  70% { opacity: 0.15; }
+  100% { transform: scale(1.28); opacity: 0; }
+}
+
+@keyframes badge-pop {
+  from { transform: scale(0.86); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes avatar-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--cyan-glow) 0%, transparent); }
+  50% { box-shadow: 0 0 18px color-mix(in srgb, var(--cyan-glow) 18%, transparent); }
+}
+
+@keyframes item-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar,
+  .topbar::before,
+  .topbar::after,
+  .topbar-icon-btn,
+  .topbar-icon-btn svg,
+  .topbar-notif-dot,
+  .topbar-notif-dot::after,
+  .topbar-avatar,
+  .topbar-search::before,
+  .topbar-dropdown .topbar-drop-item,
+  .notif-dropdown,
+  .notif-item {
+    animation: none !important;
+  }
+  .topbar-search,
+  .topbar-icon-btn,
+  .topbar-avatar-btn,
+  .topbar-drop-item,
+  .notif-item {
+    transition: none !important;
+  }
 }

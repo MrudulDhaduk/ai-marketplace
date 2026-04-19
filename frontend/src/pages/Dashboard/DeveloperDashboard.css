@@ -57,6 +57,189 @@
   position: relative;
 }
 
+/***********************************************************
+   ULTRA-DYNAMIC, CINEMATIC & INSANELY INTERACTIVE UPGRADE
+************************************************************/
+
+/* 1. ULTRA-PARALLAX GLOBAL FLOATING */
+.dev-header,
+.dev-card,
+.dev-project-card,
+.dev-feed {
+  animation: float-dev 6s ease-in-out infinite;
+  /* Encourage paint optimizations */
+  will-change: transform;
+}
+@keyframes float-dev {
+  0%,100% { transform: translateY(0px);}
+  50%     { transform: translateY(-6px);}
+}
+
+/* 2. MOUSE REACTIVE TILT — elevates on hover */
+.dev-card:hover,
+.dev-project-card:hover {
+  transform: perspective(1200px) rotateX(3deg) rotateY(-3deg) scale(1.03);
+  z-index: 5;
+}
+
+/* 3. DYNAMIC MOVING GLOW LAYER */
+.dev-card::before,
+.dev-project-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 30% 20%, var(--cyan-dim), transparent 60%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.3s ease;
+}
+.dev-card:hover::before,
+.dev-project-card:hover::before {
+  opacity: 1;
+}
+
+/* 4. LIGHT SWEEP / SHINE EFFECT */
+.dev-card::after,
+.dev-project-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.08), transparent);
+  transform: skewX(-20deg);
+  opacity: 0.9;
+  pointer-events: none;
+  z-index: 2;
+  transition: left 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dev-card:hover::after,
+.dev-project-card:hover::after {
+  left: 130%;
+  transition: left 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 5. BUTTONS → POWER FEEL */
+@keyframes dev-glow {
+  0%,100% { box-shadow: 0 0 12px var(--cyan-glow);}
+  50%     { box-shadow: 0 0 28px var(--cyan-glow);}
+}
+.dev-action-btn {
+  animation: dev-glow 3s ease-in-out infinite;
+  transition: transform 0.18s var(--expo), box-shadow 0.22s ease;
+  box-shadow: 0 0 12px var(--cyan-glow);
+  will-change: transform, box-shadow;
+}
+.dev-action-btn:hover {
+  transform: translateY(-4px) scale(1.07);
+  box-shadow: 0 8px 30px 0 var(--cyan-glow), 0 0 18px var(--cyan-glow);
+  animation-play-state: paused;
+}
+.dev-action-btn:active {
+  animation: dev-glow 0.33s cubic-bezier(.8,2,.4,1) 1;
+  transform: scale(0.96);
+}
+
+/* 6. PROJECT CARD MICROINTERACTIONS */
+.dev-project-card {
+  transition: transform 0.22s var(--expo), box-shadow 0.25s var(--expo);
+}
+.dev-project-card:hover {
+  transform: scale(1.035) perspective(1200px) rotateX(2deg) rotateY(-1.5deg);
+  z-index: 3;
+}
+.dev-project-title {
+  transition: transform 0.3s ease;
+}
+.dev-project-card:hover .dev-project-title {
+  transform: translateX(4px);
+}
+.dev-project-card .dev-project-tag {
+  box-shadow: 0 0 0 0 transparent;
+  transition: box-shadow 0.25s cubic-bezier(.17,.67,.48,1.21);
+}
+.dev-project-card:hover .dev-project-tag {
+  box-shadow: 0 0 20px 0 var(--cyan-glow);
+  border-color: var(--cyan-dim);
+}
+
+/* 7. BID BUTTON — ULTRA POWERFUL */
+.dd-bid-btn {
+  animation: dev-glow 2.1s ease-in-out infinite;
+  transition: transform 0.23s var(--spring), box-shadow 0.3s ease;
+  will-change: transform, box-shadow;
+}
+.dd-bid-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 10px 40px var(--cyan-glow), 0 6px 24px var(--cyan-dim);
+  z-index: 22;
+}
+/* Stronger click ripple effect should be handled by JS, but pump up visual fallback: */
+.dd-bid-btn:active {
+  filter: brightness(1.02) blur(0.5px);
+  transform: scale(0.96);
+}
+
+/* 8. LIVE FEED / ACTIVITY PANEL */
+.dev-feed-item {
+  opacity: 0;
+  transform: translateX(-36px);
+  animation: dev-feed-slide-in 1s var(--expo) both;
+  background-clip: padding-box;
+  position: relative;
+  transition: box-shadow 0.25s ease, transform 0.18s var(--expo);
+}
+@keyframes dev-feed-slide-in {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.dev-feed-item:hover {
+  transform: translateX(6px) scale(1.017);
+  box-shadow: 0 2px 12px var(--cyan-dim);
+}
+.dev-feed-item.dev-feed-item--new {
+  animation: dev-feed-pulse 1.9s cubic-bezier(.6,1,.5,1.2) infinite, dev-feed-slide-in 1s var(--expo) both;
+}
+@keyframes dev-feed-pulse {
+  0%,100% { box-shadow: 0 0 7px 0 var(--cyan-glow);}
+  50%     { box-shadow: 0 0 22px 3px var(--cyan-glow);}
+}
+
+/* 9. AMBIENT BACKGROUND INTERACTION */
+.dd-main::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 70% 20%, var(--cyan-dim), transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dd-main::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 15% 85%, rgba(139, 92, 246, 0.06), transparent 55%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 10. PERFORMANCE: Encourage paint optimizations on cards */
+.dev-card,
+.dev-project-card {
+  will-change: transform;
+}
+
+/* === END CINEMATIC DYNAMIC UPGRADE === */
+
+
+/* --- EXISTING UNMODIFIED CSS BELOW --- */
+
 /* ════════════════════════════════════════════════════
    BACKGROUND  (position:fixed — escapes all stacking)
 ════════════════════════════════════════════════════ */
@@ -184,191 +367,6 @@
 }
 
 /* ════════════════════════════════════════════════════
-   SIDEBAR
-════════════════════════════════════════════════════ */
-.dd-sidebar {
-  position: fixed;
-  top: var(--navbar-h);
-  left: 0;
-  bottom: 0;
-  width: var(--sb-w);
-  z-index: 40;
-  display: flex;
-  flex-direction: column;
-  padding: 20px 0 16px;
-  background: rgba(8, 12, 24, 0.88);
-  backdrop-filter: blur(20px);
-  border-right: 1px solid var(--border);
-  transition: width 0.3s var(--expo);
-  overflow: hidden;
-}
-
-.dd-sidebar--open {
-  width: var(--sb-open-w);
-}
-
-.dd-sb-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 12px;
-  margin-bottom: 28px;
-  flex-shrink: 0;
-}
-
-.dd-sb-mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  flex-shrink: 0;
-  background: linear-gradient(135deg, var(--cyan), var(--violet));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 13px;
-  color: #fff;
-  box-shadow: 0 4px 16px var(--cyan-glow);
-}
-
-.dd-sb-wordmark {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-  white-space: nowrap;
-  opacity: 0;
-  transform: translateX(-8px);
-  transition: opacity 0.22s ease, transform 0.22s ease;
-}
-
-.dd-sidebar--open .dd-sb-wordmark {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.dd-sb-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 8px;
-  flex: 1;
-}
-
-.dd-sb-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border-radius: 9px;
-  border: none;
-  background: transparent;
-  color: var(--text-2);
-  cursor: pointer;
-  font-family: 'Manrope', sans-serif;
-  font-size: 13.5px;
-  font-weight: 500;
-  white-space: nowrap;
-  transition: background 0.18s ease, color 0.18s ease;
-  width: 100%;
-}
-
-.dd-sb-item:hover {
-  background: var(--surface-3);
-  color: var(--text);
-}
-
-.dd-sb-item--on {
-  background: var(--cyan-dim);
-  color: var(--cyan);
-}
-
-.dd-sb-icon {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.dd-sb-icon svg {
-  width: 17px;
-  height: 17px;
-}
-
-.dd-sb-label {
-  opacity: 0;
-  transform: translateX(-6px);
-  transition: opacity 0.2s ease 0.04s, transform 0.2s ease 0.04s;
-}
-
-.dd-sidebar--open .dd-sb-label {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.dd-sb-pip {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 18px;
-  border-radius: 2px 0 0 2px;
-  background: var(--cyan);
-  box-shadow: 0 0 10px var(--cyan-glow);
-}
-
-.dd-sb-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 12px 0;
-  border-top: 1px solid var(--border);
-}
-
-.dd-sb-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: linear-gradient(135deg, var(--cyan), var(--violet));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 13px;
-  color: #fff;
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px rgba(6, 182, 212, 0.3);
-}
-
-.dd-sb-user {
-  opacity: 0;
-  transform: translateX(-6px);
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.dd-sidebar--open .dd-sb-user {
-  opacity: 1;
-  transform: translateX(0);
-}
-
-.dd-sb-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.dd-sb-role {
-  font-size: 11px;
-  color: var(--cyan);
-}
-
-/* ════════════════════════════════════════════════════
    MAIN
 ════════════════════════════════════════════════════ */
 .dd-main {
@@ -416,7 +414,7 @@
   color: var(--cyan);
   font-weight: 500;
   background: var(--cyan-dim);
-  border: 1px solid rgba(6, 182, 212, 0.2);
+  border: 1px solid var(--cyan-glow);
   padding: 2px 10px;
   border-radius: 20px;
 }
@@ -443,8 +441,8 @@
 }
 
 .dd-search:focus-within {
-  border-color: rgba(6, 182, 212, 0.5);
-  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-dim);
 }
 
 .dd-search-icon {
@@ -561,7 +559,7 @@
   font-weight: 600;
   font-size: 13px;
   color: #fff;
-  box-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+  box-shadow: 0 0 10px var(--cyan-glow);
   transition: transform 0.2s ease;
 }
 
@@ -664,6 +662,7 @@
 }
 
 .dd-stat {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -671,33 +670,87 @@
   border-radius: 11px;
   background: var(--surface);
   border: 1px solid var(--border);
-  animation: dd-rise 0.45s var(--expo) both;
-  animation-delay: calc(var(--si) * 0.07s);
-  transition: border-color 0.22s ease, transform 0.22s var(--spring);
+  isolation: isolate;
+  animation:
+    dd-rise 0.45s var(--expo) both,
+    dd-float-soft 6s ease-in-out infinite;
+  animation-delay: calc(var(--si) * 0.07s), calc(var(--si, 0) * 0.2s);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s var(--spring);
   cursor: default;
+  will-change: transform;
 }
 
 .dd-stat:hover {
-  transform: translateY(-2px);
+  transform: perspective(1000px) rotateX(2deg) rotateY(-2deg) scale(1.02);
 }
 
 .dd-stat--cyan:hover {
-  border-color: rgba(6, 182, 212, 0.35);
+  border-color: var(--cyan-glow);
+  box-shadow: 0 8px 28px var(--cyan-dim);
 }
 
 .dd-stat--violet:hover {
   border-color: rgba(139, 92, 246, 0.35);
+  box-shadow: 0 8px 28px rgba(139, 92, 246, 0.12);
 }
 
 .dd-stat--teal:hover {
   border-color: rgba(20, 184, 166, 0.35);
+  box-shadow: 0 8px 28px rgba(20, 184, 166, 0.12);
+}
+
+.dd-stat::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent, var(--cyan), var(--violet), transparent);
+  opacity: 0;
+  transition: opacity 0.3s var(--expo);
+  z-index: 2;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+}
+
+.dd-stat:hover::before {
+  opacity: 1;
+}
+
+.dd-stat::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.08), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  transition: left 0.6s var(--expo);
+  z-index: 3;
+}
+
+.dd-stat:hover::after {
+  left: 120%;
 }
 
 .dd-stat-val {
+  position: relative;
+  z-index: 4;
   font-family: 'DM Mono', monospace;
   font-size: 22px;
   font-weight: 500;
   line-height: 1;
+  text-shadow: 0 0 8px currentColor;
+  transition: text-shadow 0.3s var(--expo);
+}
+
+.dd-stat:hover .dd-stat-val {
+  text-shadow: 0 0 16px currentColor;
 }
 
 .dd-stat--cyan .dd-stat-val {
@@ -713,6 +766,8 @@
 }
 
 .dd-stat-lbl {
+  position: relative;
+  z-index: 4;
   font-size: 11.5px;
   color: var(--text-2);
   font-weight: 500;
@@ -729,7 +784,11 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  animation: dd-rise 0.5s var(--expo) 0.1s both;
+  animation:
+    dd-rise 0.5s var(--expo) 0.1s both,
+    dd-float-soft 6s ease-in-out infinite;
+  animation-delay: 0s, 0.35s;
+  will-change: transform;
 }
 
 /* ── Filters ── */
@@ -782,7 +841,7 @@
 .dd-filter-chip--on {
   background: var(--cyan-dim);
   color: var(--cyan);
-  border-color: rgba(6, 182, 212, 0.3);
+  border-color: var(--cyan-glow);
 }
 
 .dd-filter-chip svg {
@@ -793,8 +852,8 @@
 .dd-filter-clear {
   padding: 6px 12px;
   border-radius: 7px;
-  border: 1px solid rgba(244, 63, 94, 0.3);
-  background: rgba(244, 63, 94, 0.08);
+  border: 1px solid var(--rose-dim);
+  background: var(--rose-dim);
   color: var(--rose);
   font-family: 'Manrope', sans-serif;
   font-size: 12.5px;
@@ -806,6 +865,48 @@
 
 .dd-filter-clear:hover {
   background: rgba(244, 63, 94, 0.14);
+}
+
+.dd-filter-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--cyan-glow);
+  background: var(--cyan-dim);
+  color: var(--cyan);
+  font-family: 'Manrope', sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.22s var(--spring), box-shadow 0.25s ease, border-color 0.2s ease;
+  box-shadow: 0 2px 14px var(--cyan-dim);
+  animation: dd-glow-pulse-dev 3s ease-in-out infinite;
+}
+
+@keyframes dd-glow-pulse-dev {
+  0%,
+  100% {
+    box-shadow: 0 2px 14px var(--cyan-dim);
+  }
+
+  50% {
+    box-shadow: 0 4px 22px var(--cyan-glow);
+  }
+}
+
+.dd-filter-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  border-color: var(--cyan);
+  box-shadow: 0 6px 24px var(--cyan-glow);
+  animation-play-state: paused;
+}
+
+.dd-filter-btn:active {
+  transform: translateY(0) scale(0.98);
 }
 
 /* ── Tag dropdown ── */
@@ -967,14 +1068,60 @@
   border: 1px solid var(--border);
   overflow: hidden;
   cursor: pointer;
+  isolation: isolate;
   animation: dd-rise 0.45s var(--expo) both;
   animation-delay: calc(var(--ci) * 0.055s);
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s var(--expo);
+  will-change: transform;
 }
 
 .dd-card:hover {
-  border-color: rgba(6, 182, 212, 0.3);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(6, 182, 212, 0.08);
+  border-color: var(--cyan-glow);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--cyan-dim);
+}
+
+.dd-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent, var(--cyan), var(--violet), transparent);
+  opacity: 0;
+  transition: opacity 0.3s var(--expo);
+  z-index: 2;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+}
+
+.dd-card:hover::before {
+  opacity: 1;
+}
+
+.dd-card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.08), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  transition: left 0.6s var(--expo);
+  z-index: 3;
+}
+
+.dd-card:hover::after {
+  left: 120%;
+}
+
+.dd-card > *:not(.dd-card-glow) {
+  position: relative;
+  z-index: 6;
 }
 
 /* ── Animated left-border accent ── */
@@ -984,6 +1131,7 @@
   top: 0;
   bottom: 0;
   width: 3px;
+  z-index: 5;
   background: linear-gradient(180deg, var(--cyan), var(--violet));
   border-radius: 14px 0 0 14px;
   opacity: 0;
@@ -1018,7 +1166,7 @@
 .s-open {
   background: var(--cyan-dim);
   color: var(--cyan);
-  border: 1px solid rgba(6, 182, 212, 0.25);
+  border: 1px solid var(--cyan-glow);
 }
 
 .s-bidding {
@@ -1060,11 +1208,12 @@
   letter-spacing: -0.2px;
   line-height: 1.3;
   color: var(--text);
-  transition: color 0.2s ease;
+  transition: color 0.2s ease, transform 0.25s var(--expo);
 }
 
 .dd-card:hover .dd-card-title {
   color: #fff;
+  transform: translateX(3px);
 }
 
 /* Description */
@@ -1096,18 +1245,18 @@
   border: 1px solid var(--border);
   font-family: 'DM Mono', monospace;
   font-weight: 500;
-  transition: all 0.18s ease;
-  ;
+  transition: border-color 0.18s ease, box-shadow 0.25s cubic-bezier(0.17, 0.67, 0.48, 1.21);
 }
 
 .dd-card:hover .dd-tag {
-  border-color: rgba(6, 182, 212, 0.15);
+  border-color: var(--cyan-dim);
+  box-shadow: 0 0 18px 0 var(--cyan-glow);
 }
 
 .dd-tag--more {
   color: var(--cyan);
   background: var(--cyan-dim);
-  border-color: rgba(6, 182, 212, 0.2);
+  border-color: var(--cyan-glow);
 }
 
 /* Footer */
@@ -1156,7 +1305,7 @@
   font-weight: 700;
   cursor: pointer;
   transition: transform 0.22s var(--spring), box-shadow 0.22s ease;
-  box-shadow: 0 4px 16px rgba(6, 182, 212, 0.3);
+  box-shadow: 0 4px 16px var(--cyan-glow);
   flex-shrink: 0;
 }
 
@@ -1167,7 +1316,7 @@
 
 .dd-bid-btn:hover {
   transform: translateY(-2px) scale(1.03);
-  box-shadow: 0 6px 24px rgba(6, 182, 212, 0.45);
+  box-shadow: 0 6px 24px var(--cyan-glow);
 }
 
 .dd-bid-btn:active {
@@ -1178,7 +1327,8 @@
 .dd-card-glow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 100% 0%, rgba(6, 182, 212, 0.05), transparent 55%);
+  z-index: 1;
+  background: radial-gradient(ellipse at 100% 0%, var(--cyan-dim), transparent 55%);
   opacity: 0;
   transition: opacity 0.3s ease;
   pointer-events: none;
@@ -1242,7 +1392,7 @@
   height: 56px;
   border-radius: 14px;
   background: var(--cyan-dim);
-  border: 1px solid rgba(6, 182, 212, 0.2);
+  border: 1px solid var(--cyan-glow);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1270,7 +1420,7 @@
 .dd-empty-cta {
   padding: 10px 24px;
   border-radius: 9px;
-  border: 1px solid rgba(6, 182, 212, 0.3);
+  border: 1px solid var(--cyan-glow);
   background: var(--cyan-dim);
   color: var(--cyan);
   font-family: 'Manrope', sans-serif;
@@ -1282,7 +1432,7 @@
 }
 
 .dd-empty-cta:hover {
-  background: rgba(6, 182, 212, 0.18);
+  background: var(--cyan-glow);
 }
 
 /* ════════════════════════════════════════════════════
@@ -1326,6 +1476,17 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes dd-float-soft {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
   }
 }
 
@@ -1381,8 +1542,51 @@
   .dd-bg-cursor {
     transition: none !important;
   }
-}
 
+  .dd-stat,
+  .dd-card,
+  .dd-controls,
+  .dd-filter-btn {
+    animation: none !important;
+  }
+
+  .dd-stat:hover,
+  .dd-stat--cyan:hover,
+  .dd-stat--violet:hover,
+  .dd-stat--teal:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  .dd-stat::before,
+  .dd-stat::after,
+  .dd-card::before,
+  .dd-card::after {
+    transition: none !important;
+  }
+
+  .dd-stat:hover::before,
+  .dd-card:hover::before {
+    opacity: 0 !important;
+  }
+
+  .dd-stat:hover::after,
+  .dd-card:hover::after {
+    left: -100% !important;
+  }
+
+  .dd-stat:hover .dd-stat-val {
+    text-shadow: none !important;
+  }
+
+  .dd-filter-btn:hover {
+    transform: none !important;
+  }
+
+  .dd-card:hover .dd-card-title {
+    transform: none !important;
+  }
+}
 
 .dd-shell {
   display: flex;

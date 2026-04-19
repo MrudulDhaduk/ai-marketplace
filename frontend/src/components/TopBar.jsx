@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./TopBar.css";
+import { socket } from "../socket";
 /* ═══════════════════════════════════════
    ICONS
 ═══════════════════════════════════════ */
@@ -114,8 +115,11 @@ export default function TopBar({
 }) {
   const navigate = useNavigate();
   const [dropOpen, setDropOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [searchFocused, setFocused] = useState(false);
   const dropRef = useRef(null);
+  const notifRef = useRef(null);
   const searchRef = useRef(null);
 
   const user = (() => {
@@ -128,26 +132,57 @@ export default function TopBar({
 
   const initial = user?.username?.[0]?.toUpperCase() || "U";
 
-  /* Close dropdown on outside click */
+  /* Close dropdowns on outside click */
   useEffect(() => {
-    if (!dropOpen) return;
+    if (!dropOpen && !notifOpen) return;
     const handler = (e) => {
-      if (dropRef.current && !dropRef.current.contains(e.target)) {
-        setDropOpen(false);
-      }
+      if (dropOpen && dropRef.current && !dropRef.current.contains(e.target)) setDropOpen(false);
+      if (notifOpen && notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, [dropOpen]);
+  }, [dropOpen, notifOpen]);
 
-  /* Keyboard: close dropdown on Escape */
+  /* Keyboard: close dropdowns on Escape */
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === "Escape") setDropOpen(false);
+      if (e.key === "Escape") {
+        setDropOpen(false);
+        setNotifOpen(false);
+      }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, []);
+
+  /* Register user for role-based rooms */
+  useEffect(() => {
+    if (user?.id) {
+      socket.emit("register", user.id);
+    }
+  }, [user]);
+
+  /* Role-based listeners */
+  useEffect(() => {
+    if (!user) return;
+
+    if (user.role === "client") {
+      socket.on("new_bid", (data) => {
+        setNotifications((prev) => [data, ...prev]);
+      });
+    }
+
+    if (user.role === "developer") {
+      socket.on("bid_accepted", (data) => {
+        setNotifications((prev) => [data, ...prev]);
+      });
+    }
+
+    return () => {
+      socket.off("new_bid");
+      socket.off("bid_accepted");
+    };
+  }, [user]);
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("user");
@@ -213,14 +248,36 @@ export default function TopBar({
         )}
 
         {/* Notification bell */}
-        <button
-          className="topbar-icon-btn"
-          title="Notifications"
-          aria-label="Notifications"
-        >
-          <IBell />
-          <span className="topbar-notif-dot" aria-hidden="true" />
-        </button>
+        <div ref={notifRef} style={{ position: "relative" }}>
+          <button
+            className="topbar-icon-btn"
+            title="Notifications"
+            aria-label="Notifications"
+            onClick={() => setNotifOpen((v) => !v)}
+          >
+            <IBell />
+            <span className="topbar-notif-dot" aria-hidden="true" />
+            {notifications.length > 0 && (
+              <span className="topbar-notif-count">
+                {notifications.length}
+              </span>
+            )}
+          </button>
+
+          {notifOpen && (
+            <div className="notif-dropdown">
+              {notifications.length === 0 ? (
+                <p className="notif-empty">No notifications</p>
+              ) : (
+                notifications.map((n, i) => (
+                  <div key={i} className="notif-item">
+                    {n.message}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Profile */}
         <div className="topbar-profile" ref={dropRef}>
