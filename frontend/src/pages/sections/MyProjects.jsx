@@ -1,4 +1,4 @@
-export default function MyProjects({ assignedProjects }) {
+export default function MyProjects({ assignedProjects, onOpenProject }) {
   if (!assignedProjects || assignedProjects.length === 0) {
     return (
       <div className="dd-content">
@@ -11,8 +11,8 @@ export default function MyProjects({ assignedProjects }) {
   return (
     <div className="dd-content">
       <div className="dd-grid">
-        {(Array.isArray(assignedProjects) ? assignedProjects : []).map((p) => (
-          <div key={p.id} className="dd-card dd-card--assigned">
+        {(Array.isArray(assignedProjects) ? assignedProjects : []).map((p, idx) => (
+          <div key={p.id} className="dd-card dd-card--assigned" style={{ "--ci": idx }}>
             
             <h3 className="dd-card-title">{p.title}</h3>
             
@@ -32,7 +32,11 @@ export default function MyProjects({ assignedProjects }) {
               </span>
             </div>
 
-            <button className="dd-bid-btn">
+            <button
+              className="dd-bid-btn"
+              // Opens workspace in-place without changing route/layout.
+              onClick={() => onOpenProject?.(p)}
+            >
               {p.status === "active"
                 ? "Continue Work →"
                 : "View Details"}

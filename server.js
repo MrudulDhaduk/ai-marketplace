@@ -10,7 +10,9 @@ const http = require("http");
 const { Server } = require("socket.io");
 
 const server = http.createServer(app);
-
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs/promises");
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -613,7 +615,7 @@ app.get("/projects/assigned/:id", async (req, res) => {
        WHERE assigned_developer_id = $1
        AND status IN ('active', 'completed')
        ORDER BY due_date ASC`,
-      [id]
+      [id],
     );
 
     res.json(result.rows);
@@ -660,7 +662,7 @@ app.get("/bids/developer/:id", async (req, res) => {
        JOIN projects ON bids.project_id = projects.id
        WHERE bids.developer_id = $1
        ORDER BY bids.created_at DESC`,
-      [id]
+      [id],
     );
 
     res.json(result.rows);
@@ -669,6 +671,248 @@ app.get("/bids/developer/:id", async (req, res) => {
     res.status(500).json({ message: "Error fetching bids" });
   }
 });
+
+/* ════════════════════════════════════════════════════
+    Mark project as completed (developer action)
+════════════════════════════════════════════════════ */
+
+app.put("/projects/:id/complete", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `UPDATE projects 
+       SET status = 'completed'
+       WHERE id = $1
+       RETURNING *`,
+      [id],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    res.json({
+      message: "Project marked as completed",
+      project: result.rows[0],
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error completing project" });
+  }
+});
+
+/* ════════════════════════════════════════════════════
+    repo,drive link submittion
+════════════════════════════════════════════════════ */
+app.post("/projects/:id/submit", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { repoLink, demoLink, notes } = req.body;
+
+    const result = await pool.query(
+      `UPDATE projects 
+       SET deliverable_link = $1,
+           demo_link = $2,
+           submission_note = $3,
+           submitted_at = NOW()
+       WHERE id = $4
+       RETURNING *`,
+      [repoLink, demoLink, notes, id],
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Submission failed" });
+  }
+});
+
+/* ════════════════════════════════════════════════════
+    File upload API (for project deliverables)
+════════════════════════════════════════════════════ */
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "text/plain",
+    "application/zip",
+  ];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Invalid file type"), false);
+  }
+};
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const base = path.basename(file.originalname, ext);
+
+    const cleanName = base
+      .replace(/\s+/g, "_") // spaces → _
+      .replace(/[^\w\-]/g, ""); // remove weird chars
+
+    const uniqueSuffix = Date.now().toString().slice(-4); // small unique
+
+    cb(null, `${cleanName}${ext}`);
+  },
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter,
+});
+
+app.post("/projects/:id/upload", (req, res) => {
+  upload.fields([
+    { name: "files", maxCount: 10 },
+    { name: "file", maxCount: 1 },
+  ])(req, res, async (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ message: "File too large (max 5MB)" });
+      }
+      return res.status(400).json({ message: err.message });
+    } else if (err) {
+      return res.status(400).json({ message: err.message });
+    }
+
+    try {
+      const filesFromPayload = [
+        ...(req.files?.files || []),
+        ...(req.files?.file || []),
+      ];
+
+      if (!filesFromPayload.length) {
+        return res.status(400).json({ message: "No files uploaded" });
+      }
+
+      const { id } = req.params;
+      const insertedRows = [];
+
+      for (const file of filesFromPayload) {
+        const inserted = await pool.query(
+          `INSERT INTO project_files (project_id, file_name, position)
+           VALUES (
+             $1,
+             $2,
+             (SELECT COALESCE(MAX(position), 0) + 1 FROM project_files WHERE project_id = $1)
+           )
+           RETURNING *`,
+          [id, file.filename],
+        );
+
+        insertedRows.push(inserted.rows[0]);
+      }
+
+      res.json({
+        message: "Files uploaded successfully",
+        files: insertedRows,
+      });
+    } catch (error) {
+      console.error("UPLOAD ERROR:", error);
+      res.status(500).json({ message: "Upload failed" });
+    }
+  });
+});
+
+app.get("/projects/:id/files", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT * FROM project_files
+       WHERE project_id = $1
+       ORDER BY position ASC`,
+      [id],
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to fetch project files" });
+  }
+});
+
+app.delete("/files/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const fileResult = await pool.query(
+      "SELECT file_name FROM project_files WHERE id = $1",
+      [id],
+    );
+
+    if (!fileResult.rows.length) {
+      return res.status(404).json({ message: "File not found" });
+    }
+
+    const fileName = fileResult.rows[0].file_name;
+    const filePath = path.join(__dirname, "uploads", fileName);
+
+    try {
+      await fs.unlink(filePath);
+    } catch (unlinkError) {
+      if (unlinkError.code !== "ENOENT") {
+        throw unlinkError;
+      }
+    }
+
+    await pool.query("DELETE FROM project_files WHERE id = $1", [id]);
+    res.json({ message: "File deleted successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to delete file" });
+  }
+});
+
+app.put("/files/reorder", async (req, res) => {
+  try {
+    const updates = req.body;
+
+    if (!Array.isArray(updates)) {
+      return res.status(400).json({ message: "Invalid reorder payload" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      for (const item of updates) {
+        if (
+          typeof item?.id !== "number" ||
+          typeof item?.position !== "number"
+        ) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({ message: "Invalid reorder item" });
+        }
+
+        await client.query(
+          "UPDATE project_files SET position = $1 WHERE id = $2",
+          [item.position, item.id],
+        );
+      }
+      await client.query("COMMIT");
+    } catch (transactionError) {
+      await client.query("ROLLBACK");
+      throw transactionError;
+    } finally {
+      client.release();
+    }
+
+    res.json({ message: "Files reordered successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to reorder files" });
+  }
+});
+app.use("/uploads", express.static("uploads"));
 
 server.listen(5000, () => {
   console.log("Server running on port 5000");

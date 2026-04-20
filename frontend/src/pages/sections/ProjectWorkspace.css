@@ -1,0 +1,259 @@
+.dd-workspace {
+  animation: dd-rise 0.45s var(--expo) both;
+}
+
+.dd-workspace-header {
+  margin-bottom: 16px;
+}
+
+.dd-workspace-top {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.dd-workspace-back {
+  width: fit-content;
+}
+
+.dd-workspace-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dd-workspace-meta {
+  display: flex;
+  gap: 12px;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-family: "DM Mono", monospace;
+}
+
+.dd-workspace-body {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+.dd-workspace-left {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dd-workspace-description {
+  line-clamp: unset;
+  -webkit-line-clamp: unset;
+}
+
+.dd-workspace-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dd-workspace-progress {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.dd-workspace-progress-fill {
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  box-shadow: 0 0 12px var(--cyan-glow);
+}
+
+@media (max-width: 900px) {
+  .dd-workspace-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dd-workspace .dd-card:hover {
+  transform: translateY(-4px);
+}
+
+.dd-input {
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.dd-input:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan);
+}
+
+/* Upload container */
+.dd-file-upload {
+  display: inline-block;
+  cursor: pointer;
+}
+
+/* Button style */
+.dd-file-btn {
+  display: inline-block;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.25s ease;
+  box-shadow: 0 0 12px var(--cyan-glow);
+}
+
+/* Hover effect */
+.dd-file-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 0 18px var(--cyan-glow);
+}
+
+/* File name display */
+.dd-file-name {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  word-break: break-all;
+}
+
+/* Button */
+.dd-file-btn {
+  display: inline-block;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 0 12px var(--cyan-glow);
+}
+
+/* Hover */
+.dd-file-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+}
+
+/* Click effect 🔥 */
+.dd-file-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 0 6px var(--cyan-glow);
+}
+
+/* Button */
+.dd-file-btn {
+  display: inline-block;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--cyan), var(--violet));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 0 12px var(--cyan-glow);
+}
+
+/* Hover */
+.dd-file-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+}
+
+/* Click effect 🔥 */
+.dd-file-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 0 6px var(--cyan-glow);
+}
+
+.dd-file-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--cyan);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.dd-file-link:hover {
+  text-decoration: underline;
+  color: var(--violet);
+}
+
+.dd-file-input {
+  display: none;
+}
+
+.dd-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.dd-file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  cursor: grab;
+}
+
+.dd-file-item:active {
+  cursor: grabbing;
+}
+
+.dd-file-item .dd-file-link {
+  margin-top: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dd-file-delete {
+  background: transparent;
+  border: none;
+  color: #ff5c5c;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.dd-upload-progress {
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: 999px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.dd-upload-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), var(--violet));
+  transition: width 0.2s ease;
+}
+
+.dd-file-link {
+  max-width: 200px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  display: inline-block;
+}

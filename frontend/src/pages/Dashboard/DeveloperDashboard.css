@@ -1410,7 +1410,7 @@
   letter-spacing: -0.3px;
 }
 
-.dd-empty-sub {
+.dd-empty-sub { 
   font-size: 14px;
   color: var(--text-2);
   max-width: 340px;
