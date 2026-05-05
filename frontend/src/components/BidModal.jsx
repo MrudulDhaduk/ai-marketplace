@@ -2,31 +2,117 @@ import { useState, useEffect, useRef } from "react";
 import "./BidModal.css";
 
 /* ─── icons ─────────────────────────────────────── */
-function IClose()  { return <svg viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>; }
-function IWallet() { return <svg viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M2 10h20" stroke="currentColor" strokeWidth="1.5"/><circle cx="17" cy="15" r="1.5" fill="currentColor"/></svg>; }
-function IZap()    { return <svg viewBox="0 0 24 24" fill="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>; }
-function ICheck()  { return <svg viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
-function IWarn()   { return <svg viewBox="0 0 24 24" fill="none"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="currentColor" strokeWidth="1.5"/><line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>; }
-function IInfo()   { return <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5"/><line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>; }
+function IClose() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <path
+        d="M18 6 6 18M6 6l12 12"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+function IWallet() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <rect
+        x="2"
+        y="6"
+        width="20"
+        height="14"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path d="M2 10h20" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="17" cy="15" r="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+function IZap() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <polygon
+        points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+function ICheck() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <path
+        d="M20 6 9 17l-5-5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+function IWarn() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <path
+        d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <line
+        x1="12"
+        y1="9"
+        x2="12"
+        y2="13"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="17" r="1" fill="currentColor" />
+    </svg>
+  );
+}
+function IInfo() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
+      <line
+        x1="12"
+        y1="8"
+        x2="12"
+        y2="12"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <circle cx="12" cy="16" r="1" fill="currentColor" />
+    </svg>
+  );
+}
 
 const MAX_PROPOSAL = 500;
 const MIN_PROPOSAL = 20;
-const PLATFORM_FEE = 0.10;
+const PLATFORM_FEE = 0.1;
 
 function fmt(n) {
   return Number(n).toLocaleString("en-IN");
 }
 
 export default function BidModal({ project, onClose }) {
-  const [amount,   setAmount]   = useState("");
+  const [amount, setAmount] = useState("");
   const [proposal, setProposal] = useState("");
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState("");
-  const [success,  setSuccess]  = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
   const [alreadyBid, setAlreadyBid] = useState(false);
 
   const overlayRef = useRef(null);
-  const amountRef  = useRef(null);
+  const amountRef = useRef(null);
 
   /* focus amount input on open */
   useEffect(() => {
@@ -36,7 +122,9 @@ export default function BidModal({ project, onClose }) {
 
   /* ESC to close */
   useEffect(() => {
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    const handler = (e) => {
+      if (e.key === "Escape") onClose();
+    };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
@@ -44,12 +132,14 @@ export default function BidModal({ project, onClose }) {
   if (!project) return null;
 
   /* ── derived values ─────────────────────────── */
-  const numAmount  = parseFloat(amount);
-  const hasAmount  = amount !== "" && !isNaN(numAmount) && numAmount > 0;
-  const tooLow     = hasAmount && numAmount < project.min_budget;
-  const tooHigh    = hasAmount && numAmount > project.max_budget;
+  const numAmount = parseFloat(amount);
+  const hasAmount = amount !== "" && !isNaN(numAmount) && numAmount > 0;
+  const tooLow = hasAmount && numAmount < project.min_budget;
+  const tooHigh = hasAmount && numAmount > project.max_budget;
   const budgetWarn = tooLow || tooHigh;
-  const netEarning = hasAmount ? (numAmount * (1 - PLATFORM_FEE)).toFixed(0) : null;
+  const netEarning = hasAmount
+    ? (numAmount * (1 - PLATFORM_FEE)).toFixed(0)
+    : null;
   const proposalLen = proposal.trim().length;
   const proposalShort = proposalLen > 0 && proposalLen < MIN_PROPOSAL;
 
@@ -66,20 +156,23 @@ export default function BidModal({ project, onClose }) {
     try {
       setLoading(true);
       setError("");
-
+      const token = localStorage.getItem("token");
       const user = JSON.parse(localStorage.getItem("user"));
 
       const res = await fetch(
         `http://localhost:5000/projects/${project.id}/bid`,
         {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
             developerId: user?.id,
-            amount:      numAmount,
-            proposal:    proposal.trim(),
+            amount: numAmount,
+            proposal: proposal.trim(),
           }),
-        }
+        },
       );
 
       const data = await res.json();
@@ -112,12 +205,18 @@ export default function BidModal({ project, onClose }) {
   if (success) {
     return (
       <div className="bm-overlay bm-overlay--visible" ref={overlayRef}>
-        <div className="bm-card bm-card--success" role="dialog" aria-modal="true">
-          <div className="bm-success-icon"><ICheck /></div>
+        <div
+          className="bm-card bm-card--success"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bm-success-icon">
+            <ICheck />
+          </div>
           <h3 className="bm-success-title">Bid Submitted!</h3>
           <p className="bm-success-sub">
-            Your bid of <strong>₹{fmt(numAmount)}</strong> has been sent to the client.
-            Good luck! 🚀
+            Your bid of <strong>₹{fmt(numAmount)}</strong> has been sent to the
+            client. Good luck! 🚀
           </p>
         </div>
       </div>
@@ -134,7 +233,6 @@ export default function BidModal({ project, onClose }) {
       aria-label={`Place bid on ${project.title}`}
     >
       <div className="bm-card">
-
         {/* ── Header ───────────────────────────── */}
         <div className="bm-header">
           <div className="bm-header-left">
@@ -142,8 +240,10 @@ export default function BidModal({ project, onClose }) {
             <h2 className="bm-header-title">{project.title}</h2>
             {project.tags?.length > 0 && (
               <div className="bm-tags">
-                {project.tags.slice(0, 4).map(t => (
-                  <span key={t} className="bm-tag">{t}</span>
+                {project.tags.slice(0, 4).map((t) => (
+                  <span key={t} className="bm-tag">
+                    {t}
+                  </span>
                 ))}
               </div>
             )}
@@ -160,7 +260,9 @@ export default function BidModal({ project, onClose }) {
 
         {/* ── Budget strip ─────────────────────── */}
         <div className="bm-budget-strip">
-          <span className="bm-budget-icon"><IWallet /></span>
+          <span className="bm-budget-icon">
+            <IWallet />
+          </span>
           <span className="bm-budget-label">Project budget</span>
           <span className="bm-budget-range">
             ₹{fmt(project.min_budget)} – ₹{fmt(project.max_budget)}
@@ -170,20 +272,23 @@ export default function BidModal({ project, onClose }) {
         {/* ── Already bid notice ───────────────── */}
         {alreadyBid && (
           <div className="bm-notice bm-notice--warn">
-            <span className="bm-notice-icon"><IWarn /></span>
+            <span className="bm-notice-icon">
+              <IWarn />
+            </span>
             You have already placed a bid on this project.
           </div>
         )}
 
         {/* ── Form ─────────────────────────────── */}
         <div className="bm-form">
-
           {/* Bid amount */}
           <div className="bm-field">
             <label className="bm-label" htmlFor="bm-amount">
               Your Bid Amount
             </label>
-            <div className={`bm-input-wrap${budgetWarn ? " bm-input-wrap--warn" : hasAmount ? " bm-input-wrap--ok" : ""}`}>
+            <div
+              className={`bm-input-wrap${budgetWarn ? " bm-input-wrap--warn" : hasAmount ? " bm-input-wrap--ok" : ""}`}
+            >
               <span className="bm-currency">₹</span>
               <input
                 id="bm-amount"
@@ -193,7 +298,7 @@ export default function BidModal({ project, onClose }) {
                 min="0"
                 placeholder="0"
                 value={amount}
-                onChange={e => setAmount(e.target.value)}
+                onChange={(e) => setAmount(e.target.value)}
                 disabled={alreadyBid}
                 aria-describedby="bm-amount-hint"
               />
@@ -225,8 +330,12 @@ export default function BidModal({ project, onClose }) {
           {/* Proposal */}
           <div className="bm-field">
             <div className="bm-label-row">
-              <label className="bm-label" htmlFor="bm-proposal">Proposal</label>
-              <span className={`bm-char-count${proposalLen >= MAX_PROPOSAL ? " bm-char-count--max" : ""}`}>
+              <label className="bm-label" htmlFor="bm-proposal">
+                Proposal
+              </label>
+              <span
+                className={`bm-char-count${proposalLen >= MAX_PROPOSAL ? " bm-char-count--max" : ""}`}
+              >
                 {proposalLen} / {MAX_PROPOSAL}
               </span>
             </div>
@@ -235,8 +344,9 @@ export default function BidModal({ project, onClose }) {
               className={`bm-textarea${proposalShort ? " bm-textarea--warn" : proposalLen >= MIN_PROPOSAL ? " bm-textarea--ok" : ""}`}
               placeholder="Explain how you will approach this project, your relevant experience, and your estimated timeline…"
               value={proposal}
-              onChange={e => {
-                if (e.target.value.length <= MAX_PROPOSAL) setProposal(e.target.value);
+              onChange={(e) => {
+                if (e.target.value.length <= MAX_PROPOSAL)
+                  setProposal(e.target.value);
               }}
               disabled={alreadyBid}
               rows={5}
@@ -245,7 +355,8 @@ export default function BidModal({ project, onClose }) {
             {proposalShort && (
               <p className="bm-hint bm-hint--warn" id="bm-proposal-hint">
                 <IWarn />
-                Minimum {MIN_PROPOSAL} characters required ({MIN_PROPOSAL - proposalLen} more needed)
+                Minimum {MIN_PROPOSAL} characters required (
+                {MIN_PROPOSAL - proposalLen} more needed)
               </p>
             )}
           </div>
@@ -254,7 +365,9 @@ export default function BidModal({ project, onClose }) {
         {/* ── Error banner ─────────────────────── */}
         {error && !alreadyBid && (
           <div className="bm-notice bm-notice--error">
-            <span className="bm-notice-icon"><IWarn /></span>
+            <span className="bm-notice-icon">
+              <IWarn />
+            </span>
             {error}
           </div>
         )}
@@ -283,7 +396,6 @@ export default function BidModal({ project, onClose }) {
             )}
           </button>
         </div>
-
       </div>
     </div>
   );

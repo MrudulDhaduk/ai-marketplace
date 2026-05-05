@@ -52,7 +52,7 @@ export default function ProjectBidsModal({ project, onClose }) {
       console.error(err);
     }
   };
-
+  const hasAccepted = bids.some((b) => b.status === "accepted");
   return (
     <div className="modal-overlay">
       <div className="modal-content">
@@ -72,7 +72,13 @@ export default function ProjectBidsModal({ project, onClose }) {
               <p>₹{bid.amount}</p>
               <p>Status: {bid.status}</p>
 
-              {bid.status !== "accepted" && (
+              {bid.status === "accepted" ? (
+                <button className="accepted-btn">Accepted ✓</button>
+              ) : bids.some((b) => b.status === "accepted") ? (
+                <button className="disabled-btn" disabled>
+                  Not Available
+                </button>
+              ) : (
                 <button onClick={() => acceptBid(bid.id)}>Accept</button>
               )}
             </div>

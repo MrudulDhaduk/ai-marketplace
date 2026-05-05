@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const pool = require("./db");
@@ -29,14 +30,13 @@ const authenticateUser = (req, res, next) => {
   const token = authHeader.split(" ")[1];
 
   try {
-    const decoded = jwt.verify(token, "SECRET_KEY");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     next();
   } catch (err) {
     return res.status(401).json({ message: "Invalid token" });
   }
 };
-
 app.get("/", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
@@ -185,7 +185,7 @@ app.post("/auth/login", async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, username: user.username },
-      "SECRET_KEY",
+      process.env.JWT_SECRET,
       { expiresIn: "1d" },
     );
 
@@ -253,9 +253,13 @@ app.get("/profile/:id", async (req, res) => {
 - DELETE /profile/:id/skills - delete a skill (body: { skill })
 */
 
-app.get("/profile/:id/skills", async (req, res) => {
+app.get("/profile/:id/skills", authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (Number(req.user.id) !== Number(id)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
 
     const result = await pool.query(
       "SELECT skill FROM user_skills WHERE user_id = $1",
@@ -269,10 +273,14 @@ app.get("/profile/:id/skills", async (req, res) => {
   }
 });
 
-app.post("/profile/:id/skills", async (req, res) => {
+app.post("/profile/:id/skills", authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
     const { skill } = req.body;
+
+    if (Number(req.user.id) !== Number(id)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
 
     const result = await pool.query(
       "INSERT INTO user_skills (user_id, skill) VALUES ($1, $2) RETURNING *",
@@ -286,10 +294,14 @@ app.post("/profile/:id/skills", async (req, res) => {
   }
 });
 
-app.delete("/profile/:id/skills", async (req, res) => {
+app.delete("/profile/:id/skills", authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
     const { skill } = req.body;
+
+    if (Number(req.user.id) !== Number(id)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
 
     await pool.query(
       "DELETE FROM user_skills WHERE user_id = $1 AND skill = $2",
@@ -353,7 +365,7 @@ app.get("/projects/discover/:id", async (req, res) => {
 /* ════════════════════════════════════════════════════
    Bidding API for developers
 ════════════════════════════════════════════════════ */
-app.post("/projects/:id/bid", async (req, res) => {
+app.post("/projects/:id/bid", authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
     const { developerId, amount, proposal } = req.body;
@@ -361,6 +373,10 @@ app.post("/projects/:id/bid", async (req, res) => {
     // 🔴 1. Basic validation
     if (!developerId || !amount || !proposal) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+
+    if (Number(developerId) !== Number(req.user.id)) {
+      return res.status(403).json({ message: "Unauthorized" });
     }
 
     // 🔴 2. Check project exists
@@ -606,9 +622,13 @@ app.post(
     Get assigned projects for developer dashboard(MY PROJECTS tab)
 ════════════════════════════════════════════════════ */
 
-app.get("/projects/assigned/:id", async (req, res) => {
+app.get("/projects/assigned/:id", authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (Number(req.user.id) !== Number(id)) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
 
     const result = await pool.query(
       `SELECT * FROM projects
@@ -633,6 +653,10 @@ io.on("connection", (socket) => {
 
   socket.on("register", (userId) => {
     socket.join(`user_${userId}`);
+  });
+
+  socket.on("join_project", (projectId) => {
+    socket.join(`project_${projectId}`);
   });
 
   socket.on("disconnect", () => {
@@ -676,9 +700,24 @@ app.get("/bids/developer/:id", async (req, res) => {
     Mark project as completed (developer action)
 ════════════════════════════════════════════════════ */
 
-app.put("/projects/:id/complete", async (req, res) => {
+app.put("/projects/:id/complete", authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
+
+    const projectCheck = await pool.query(
+      "SELECT assigned_developer_id FROM projects WHERE id = $1",
+      [id],
+    );
+
+    if (!projectCheck.rows.length) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    if (
+      Number(projectCheck.rows[0].assigned_developer_id) !== Number(req.user.id)
+    ) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
 
     const result = await pool.query(
       `UPDATE projects 
@@ -705,26 +744,182 @@ app.put("/projects/:id/complete", async (req, res) => {
 /* ════════════════════════════════════════════════════
     repo,drive link submittion
 ════════════════════════════════════════════════════ */
-app.post("/projects/:id/submit", async (req, res) => {
+app.post("/projects/:id/submit", authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
     const { repoLink, demoLink, notes } = req.body;
+
+    if (!repoLink) {
+      return res.status(400).json({ message: "Repo link required" });
+    }
+
+    const projectCheck = await pool.query(
+      "SELECT assigned_developer_id FROM projects WHERE id = $1",
+      [id],
+    );
+
+    if (!projectCheck.rows.length) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    if (
+      Number(projectCheck.rows[0].assigned_developer_id) !== Number(req.user.id)
+    ) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    await pool.query(
+      `INSERT INTO project_submissions (project_id, repo_link, demo_link, notes)
+       VALUES ($1, $2, $3, $4)`,
+      [id, repoLink, demoLink, notes],
+    );
 
     const result = await pool.query(
       `UPDATE projects 
        SET deliverable_link = $1,
            demo_link = $2,
            submission_note = $3,
-           submitted_at = NOW()
+           submitted_at = NOW(),
+           review_status = 'pending',
+           review_feedback = NULL
        WHERE id = $4
        RETURNING *`,
       [repoLink, demoLink, notes, id],
     );
 
+    // ✅ Emit real-time notification
+    io.to(`project_${id}`).emit("project_submitted", {
+      type: "project_submitted",
+      projectId: id,
+      message: "Project deliverables submitted for review",
+    });
+    io.to(`project_${id}`).emit("submission_history_updated");
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Submission failed" });
+  }
+});
+
+app.get("/projects/:id/submissions", authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const projectResult = await pool.query(
+      "SELECT client_id, assigned_developer_id FROM projects WHERE id = $1",
+      [id],
+    );
+
+    const project = projectResult.rows[0];
+
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    if (
+      project.client_id !== req.user.id &&
+      Number(project.assigned_developer_id) !== Number(req.user.id)
+    ) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    const submissionResult = await pool.query(
+      `SELECT * FROM project_submissions
+       WHERE project_id = $1
+       ORDER BY submitted_at DESC`,
+      [id],
+    );
+
+    res.json(submissionResult.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch submissions" });
+  }
+});
+
+app.get("/api/projects/:id", authenticateUser, async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM projects WHERE id = $1", [
+      req.params.id,
+    ]);
+
+    const project = result.rows[0];
+
+    if (!project) {
+      return res.status(404).json({ message: "Not found" });
+    }
+
+    if (
+      project.client_id !== req.user.id &&
+      project.assigned_developer_id !== req.user.id
+    ) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    res.json(project);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching project" });
+  }
+});
+
+/* ════════════════════════════════════════════════════
+    Project Review API (client approval/revision workflow)
+════════════════════════════════════════════════════ */
+
+app.put("/projects/:id/review", authenticateUser, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, feedback } = req.body;
+
+    if (!action || !["approve", "revision"].includes(action)) {
+      return res.status(400).json({ message: "Invalid action" });
+    }
+
+    const project = await pool.query(
+      "SELECT client_id FROM projects WHERE id = $1",
+      [id],
+    );
+
+    if (project.rows[0].client_id !== req.user.id) {
+      return res.status(403).json({ message: "Not your project" });
+    }
+
+    const reviewStatus =
+      action === "approve" ? "approved" : "revision_requested";
+
+    const result = await pool.query(
+      `UPDATE projects 
+       SET review_status = $1,
+           review_feedback = $2
+       WHERE id = $3
+       RETURNING *`,
+      [reviewStatus, feedback || null, id],
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    // ✅ Emit real-time notification to developer
+    io.to(`project_${id}`).emit("project_reviewed", {
+      type: "project_reviewed",
+      projectId: id,
+      reviewStatus: reviewStatus,
+      feedback: feedback,
+      message:
+        action === "approve"
+          ? "Your project was approved! 🎉"
+          : "Your project needs revision",
+    });
+
+    res.json({
+      message: `Project ${reviewStatus}`,
+      project: result.rows[0],
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error reviewing project" });
   }
 });
 
@@ -761,9 +956,7 @@ const storage = multer.diskStorage({
       .replace(/\s+/g, "_") // spaces → _
       .replace(/[^\w\-]/g, ""); // remove weird chars
 
-    const uniqueSuffix = Date.now().toString().slice(-4); // small unique
-
-    cb(null, `${cleanName}${ext}`);
+    cb(null, `${cleanName}_${Date.now()}${ext}`);
   },
 });
 const upload = multer({
@@ -772,7 +965,7 @@ const upload = multer({
   fileFilter,
 });
 
-app.post("/projects/:id/upload", (req, res) => {
+app.post("/projects/:id/upload", authenticateUser, (req, res) => {
   upload.fields([
     { name: "files", maxCount: 10 },
     { name: "file", maxCount: 1 },
@@ -797,6 +990,38 @@ app.post("/projects/:id/upload", (req, res) => {
       }
 
       const { id } = req.params;
+
+      const projectCheck = await pool.query(
+        "SELECT assigned_developer_id FROM projects WHERE id = $1",
+        [id],
+      );
+
+      if (!projectCheck.rows.length) {
+        for (const file of filesFromPayload) {
+          try {
+            await fs.unlink(file.path);
+          } catch (e) {
+            if (e.code !== "ENOENT") throw e;
+          }
+        }
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      if (
+        projectCheck.rows[0].assigned_developer_id == null ||
+        Number(projectCheck.rows[0].assigned_developer_id) !==
+          Number(req.user.id)
+      ) {
+        for (const file of filesFromPayload) {
+          try {
+            await fs.unlink(file.path);
+          } catch (e) {
+            if (e.code !== "ENOENT") throw e;
+          }
+        }
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
       const insertedRows = [];
 
       for (const file of filesFromPayload) {
@@ -825,9 +1050,27 @@ app.post("/projects/:id/upload", (req, res) => {
   });
 });
 
-app.get("/projects/:id/files", async (req, res) => {
+app.get("/projects/:id/files", authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
+
+    const projectRes = await pool.query(
+      "SELECT client_id, assigned_developer_id FROM projects WHERE id = $1",
+      [id],
+    );
+
+    if (!projectRes.rows.length) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    const p = projectRes.rows[0];
+    if (
+      Number(p.client_id) !== Number(req.user.id) &&
+      Number(p.assigned_developer_id || 0) !== Number(req.user.id)
+    ) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
     const result = await pool.query(
       `SELECT * FROM project_files
        WHERE project_id = $1
@@ -842,16 +1085,26 @@ app.get("/projects/:id/files", async (req, res) => {
   }
 });
 
-app.delete("/files/:id", async (req, res) => {
+app.delete("/files/:id", authenticateUser, async (req, res) => {
   try {
     const { id } = req.params;
     const fileResult = await pool.query(
-      "SELECT file_name FROM project_files WHERE id = $1",
+      `SELECT pf.file_name, p.assigned_developer_id
+       FROM project_files pf
+       INNER JOIN projects p ON p.id = pf.project_id
+       WHERE pf.id = $1`,
       [id],
     );
 
     if (!fileResult.rows.length) {
       return res.status(404).json({ message: "File not found" });
+    }
+
+    if (
+      fileResult.rows[0].assigned_developer_id == null ||
+      Number(fileResult.rows[0].assigned_developer_id) !== Number(req.user.id)
+    ) {
+      return res.status(403).json({ message: "Unauthorized" });
     }
 
     const fileName = fileResult.rows[0].file_name;
@@ -873,12 +1126,31 @@ app.delete("/files/:id", async (req, res) => {
   }
 });
 
-app.put("/files/reorder", async (req, res) => {
+app.put("/files/reorder", authenticateUser, async (req, res) => {
   try {
     const updates = req.body;
 
     if (!Array.isArray(updates)) {
       return res.status(400).json({ message: "Invalid reorder payload" });
+    }
+
+    if (!updates.length) {
+      return res.json({ message: "Files reordered successfully" });
+    }
+
+    const fileIds = updates.map((item) => item.id);
+    const ownership = await pool.query(
+      `SELECT COUNT(*)::int AS cnt
+       FROM project_files pf
+       INNER JOIN projects p ON p.id = pf.project_id
+       WHERE pf.id = ANY($1::int[])
+         AND p.assigned_developer_id IS NOT NULL
+         AND p.assigned_developer_id = $2`,
+      [fileIds, req.user.id],
+    );
+
+    if (ownership.rows[0].cnt !== updates.length) {
+      return res.status(403).json({ message: "Unauthorized" });
     }
 
     const client = await pool.connect();
@@ -913,6 +1185,136 @@ app.put("/files/reorder", async (req, res) => {
   }
 });
 app.use("/uploads", express.static("uploads"));
+
+// submission edit/delete/add (developer can edit or delete their submission if client requests revision)
+
+app.delete(
+  "/projects/:projectId/submissions/:id",
+  authenticateUser,
+  async (req, res) => {
+    const { id, projectId } = req.params;
+
+    const project = await pool.query(
+      "SELECT client_id, assigned_developer_id FROM projects WHERE id=$1",
+      [projectId],
+    );
+
+    if (!project.rows.length) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    const userId = req.user.id;
+
+    if (
+      project.rows[0].client_id !== userId &&
+      project.rows[0].assigned_developer_id !== userId
+    ) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    const result = await pool.query(
+      "DELETE FROM project_submissions WHERE id=$1 RETURNING *",
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: "Submission not found" });
+    }
+
+    io.to(`project_${projectId}`).emit("submission_history_updated");
+
+    res.json({ success: true });
+  }
+);
+
+app.put(
+  "/projects/:projectId/submissions/:id",
+  authenticateUser,
+  async (req, res) => {
+    const { id, projectId } = req.params;
+    const { notes } = req.body;
+
+    const project = await pool.query(
+      "SELECT client_id, assigned_developer_id FROM projects WHERE id=$1",
+      [projectId],
+    );
+
+    if (!project.rows.length) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    const userId = req.user.id;
+
+    if (
+      project.rows[0].client_id !== userId &&
+      project.rows[0].assigned_developer_id !== userId
+    ) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    if (!notes || !notes.trim()) {
+      return res.status(400).json({ message: "Notes cannot be empty" });
+    }
+
+    const result = await pool.query(
+      `UPDATE project_submissions
+       SET notes=$1
+       WHERE id=$2
+       RETURNING *`,
+      [notes, id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: "Submission not found" });
+    }
+
+    io.to(`project_${projectId}`).emit("submission_history_updated");
+
+    res.json({ success: true });
+  }
+);
+
+app.post(
+  "/projects/:projectId/submissions",
+  authenticateUser,
+  async (req, res) => {
+    const { projectId } = req.params;
+    const { notes } = req.body;
+
+    const project = await pool.query(
+      "SELECT client_id, assigned_developer_id FROM projects WHERE id=$1",
+      [projectId]
+    );
+
+    if (!project.rows.length) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    const userId = req.user.id;
+
+    if (
+      project.rows[0].client_id !== userId &&
+      project.rows[0].assigned_developer_id !== userId
+    ) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    if (!notes || !notes.trim()) {
+      return res.status(400).json({ message: "Notes cannot be empty" });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO project_submissions (project_id, notes)
+       VALUES ($1, $2)
+       RETURNING *`,
+      [projectId, notes.trim()]
+    );
+
+    io.to(`project_${projectId}`).emit("submission_history_updated");
+
+    res.json({ success: true, data: result.rows[0] });
+  }
+);
 
 server.listen(5000, () => {
   console.log("Server running on port 5000");

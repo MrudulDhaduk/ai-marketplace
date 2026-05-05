@@ -55,6 +55,7 @@
   /* No background — bg-layer provides it */
   /* No overflow:hidden — would clip fixed bg-layer children */
   position: relative;
+  flex-direction: column;
 }
 
 /***********************************************************
@@ -62,23 +63,23 @@
 ************************************************************/
 
 /* 1. ULTRA-PARALLAX GLOBAL FLOATING */
-.dev-header,
-.dev-card,
-.dev-project-card,
-.dev-feed {
-  animation: float-dev 6s ease-in-out infinite;
-  /* Encourage paint optimizations */
-  will-change: transform;
-}
+
 @keyframes float-dev {
-  0%,100% { transform: translateY(0px);}
-  50%     { transform: translateY(-6px);}
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
 }
 
 /* 2. MOUSE REACTIVE TILT — elevates on hover */
 .dev-card:hover,
 .dev-project-card:hover {
-  transform: perspective(1200px) rotateX(3deg) rotateY(-3deg) scale(1.03);
+  transform: translateY(-3px);
   z-index: 5;
 }
 
@@ -95,6 +96,7 @@
   z-index: 1;
   transition: opacity 0.3s ease;
 }
+
 .dev-card:hover::before,
 .dev-project-card:hover::before {
   opacity: 1;
@@ -109,13 +111,14 @@
   left: -120%;
   width: 60%;
   height: 100%;
-  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.08), transparent);
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.08), transparent);
   transform: skewX(-20deg);
   opacity: 0.9;
   pointer-events: none;
   z-index: 2;
   transition: left 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
 .dev-card:hover::after,
 .dev-project-card:hover::after {
   left: 130%;
@@ -124,22 +127,32 @@
 
 /* 5. BUTTONS → POWER FEEL */
 @keyframes dev-glow {
-  0%,100% { box-shadow: 0 0 12px var(--cyan-glow);}
-  50%     { box-shadow: 0 0 28px var(--cyan-glow);}
+
+  0%,
+  100% {
+    box-shadow: 0 0 12px var(--cyan-glow);
+  }
+
+  50% {
+    box-shadow: 0 0 28px var(--cyan-glow);
+  }
 }
+
 .dev-action-btn {
   animation: dev-glow 3s ease-in-out infinite;
   transition: transform 0.18s var(--expo), box-shadow 0.22s ease;
   box-shadow: 0 0 12px var(--cyan-glow);
   will-change: transform, box-shadow;
 }
+
 .dev-action-btn:hover {
   transform: translateY(-4px) scale(1.07);
   box-shadow: 0 8px 30px 0 var(--cyan-glow), 0 0 18px var(--cyan-glow);
   animation-play-state: paused;
 }
+
 .dev-action-btn:active {
-  animation: dev-glow 0.33s cubic-bezier(.8,2,.4,1) 1;
+  animation: dev-glow 0.33s cubic-bezier(.8, 2, .4, 1) 1;
   transform: scale(0.96);
 }
 
@@ -147,20 +160,25 @@
 .dev-project-card {
   transition: transform 0.22s var(--expo), box-shadow 0.25s var(--expo);
 }
+
 .dev-project-card:hover {
   transform: scale(1.035) perspective(1200px) rotateX(2deg) rotateY(-1.5deg);
   z-index: 3;
 }
+
 .dev-project-title {
   transition: transform 0.3s ease;
 }
+
 .dev-project-card:hover .dev-project-title {
   transform: translateX(4px);
 }
+
 .dev-project-card .dev-project-tag {
   box-shadow: 0 0 0 0 transparent;
-  transition: box-shadow 0.25s cubic-bezier(.17,.67,.48,1.21);
+  transition: box-shadow 0.25s cubic-bezier(.17, .67, .48, 1.21);
 }
+
 .dev-project-card:hover .dev-project-tag {
   box-shadow: 0 0 20px 0 var(--cyan-glow);
   border-color: var(--cyan-dim);
@@ -172,11 +190,13 @@
   transition: transform 0.23s var(--spring), box-shadow 0.3s ease;
   will-change: transform, box-shadow;
 }
+
 .dd-bid-btn:hover {
   transform: scale(1.05);
   box-shadow: 0 10px 40px var(--cyan-glow), 0 6px 24px var(--cyan-dim);
   z-index: 22;
 }
+
 /* Stronger click ripple effect should be handled by JS, but pump up visual fallback: */
 .dd-bid-btn:active {
   filter: brightness(1.02) blur(0.5px);
@@ -192,41 +212,33 @@
   position: relative;
   transition: box-shadow 0.25s ease, transform 0.18s var(--expo);
 }
+
 @keyframes dev-feed-slide-in {
   to {
     opacity: 1;
     transform: translateX(0);
   }
 }
+
 .dev-feed-item:hover {
   transform: translateX(6px) scale(1.017);
   box-shadow: 0 2px 12px var(--cyan-dim);
 }
+
 .dev-feed-item.dev-feed-item--new {
-  animation: dev-feed-pulse 1.9s cubic-bezier(.6,1,.5,1.2) infinite, dev-feed-slide-in 1s var(--expo) both;
+  animation: dev-feed-pulse 1.9s cubic-bezier(.6, 1, .5, 1.2) infinite, dev-feed-slide-in 1s var(--expo) both;
 }
+
 @keyframes dev-feed-pulse {
-  0%,100% { box-shadow: 0 0 7px 0 var(--cyan-glow);}
-  50%     { box-shadow: 0 0 22px 3px var(--cyan-glow);}
-}
 
-/* 9. AMBIENT BACKGROUND INTERACTION */
-.dd-main::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 70% 20%, var(--cyan-dim), transparent 60%);
-  pointer-events: none;
-  z-index: 0;
-}
+  0%,
+  100% {
+    box-shadow: 0 0 7px 0 var(--cyan-glow);
+  }
 
-.dd-main::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 15% 85%, rgba(139, 92, 246, 0.06), transparent 55%);
-  pointer-events: none;
-  z-index: 0;
+  50% {
+    box-shadow: 0 0 22px 3px var(--cyan-glow);
+  }
 }
 
 /* 10. PERFORMANCE: Encourage paint optimizations on cards */
@@ -371,13 +383,18 @@
 ════════════════════════════════════════════════════ */
 .dd-main {
   position: relative;
-  z-index: 1;
+  z-index: 5;
   flex: 1;
   margin-left: var(--sb-w);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   transition: margin-left 0.3s var(--expo);
+  isolation: isolate;
+}
+
+.dd-main * {
+  backface-visibility: hidden;
 }
 
 /* ════════════════════════════════════════════════════
@@ -727,7 +744,7 @@
   left: -100%;
   width: 60%;
   height: 100%;
-  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.08), transparent);
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.08), transparent);
   transform: skewX(-20deg);
   pointer-events: none;
   transition: left 0.6s var(--expo);
@@ -888,6 +905,7 @@
 }
 
 @keyframes dd-glow-pulse-dev {
+
   0%,
   100% {
     box-shadow: 0 2px 14px var(--cyan-dim);
@@ -1108,7 +1126,7 @@
   left: -100%;
   width: 60%;
   height: 100%;
-  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.08), transparent);
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.08), transparent);
   transform: skewX(-20deg);
   pointer-events: none;
   transition: left 0.6s var(--expo);
@@ -1119,7 +1137,7 @@
   left: 120%;
 }
 
-.dd-card > *:not(.dd-card-glow) {
+.dd-card>*:not(.dd-card-glow) {
   position: relative;
   z-index: 6;
 }
@@ -1410,7 +1428,7 @@
   letter-spacing: -0.3px;
 }
 
-.dd-empty-sub { 
+.dd-empty-sub {
   font-size: 14px;
   color: var(--text-2);
   max-width: 340px;
@@ -1480,6 +1498,7 @@
 }
 
 @keyframes dd-float-soft {
+
   0%,
   100% {
     transform: translateY(0);
@@ -1588,19 +1607,7 @@
   }
 }
 
-.dd-shell {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-
 .dd-body {
   display: flex;
   flex: 1;
-}
-
-.dd-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
 }

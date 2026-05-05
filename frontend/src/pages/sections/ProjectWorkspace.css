@@ -1,197 +1,197 @@
-.dd-workspace {
-  animation: dd-rise 0.45s var(--expo) both;
-}
+/* ════════════════════════════════════════════════════════
+   ProjectWorkspace.css — Shared workspace styles
+   Used by BOTH Developer and Client workspaces.
+   Keep all rules generic and reusable.
+════════════════════════════════════════════════════════ */
+
+/* ── Page entry ────────────────────────────────────────── */
+
+/* ════════════════════════════════════════════════════════
+   WORKSPACE HEADER
+════════════════════════════════════════════════════════ */
 
 .dd-workspace-header {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  padding: 20px 24px 22px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle gradient shimmer across the header */
+.dd-workspace-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--cyan) 4%, transparent) 0%,
+    transparent 50%,
+    color-mix(in srgb, var(--violet) 3%, transparent) 100%
+  );
+  pointer-events: none;
 }
 
 .dd-workspace-top {
   display: flex;
   justify-content: flex-start;
+  margin-bottom: 16px;
 }
 
 .dd-workspace-back {
   width: fit-content;
 }
 
+/* ── Title row ───────────────────────────────────────── */
 .dd-workspace-title-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.dd-workspace-title-row .dd-card-title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+/* Badge cluster */
+.dd-workspace-title-row > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   flex-wrap: wrap;
 }
 
+/* ── Meta strip ─────────────────────────────────────── */
 .dd-workspace-meta {
   display: flex;
-  gap: 12px;
+  gap: 20px;
   color: var(--text-2);
   font-size: 12.5px;
-  font-family: "DM Mono", monospace;
+  font-family: "DM Mono", "JetBrains Mono", monospace;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
 }
+
+.dd-workspace-meta span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ════════════════════════════════════════════════════════
+   WORKSPACE BODY — 2-COLUMN LAYOUT
+════════════════════════════════════════════════════════ */
 
 .dd-workspace-body {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr 380px;
   gap: 20px;
+  align-items: start;
 }
 
+/* Left column */
 .dd-workspace-left {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
+
+/* Right column — sticky action panel */
+.dd-workspace-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 20px;
+}
+
+/* ════════════════════════════════════════════════════════
+   REVIEW STATUS BADGES
+════════════════════════════════════════════════════════ */
+
+.dd-status.review {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+
+.dd-status.approved {
+  background: rgba(74, 222, 128, 0.1);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.28);
+}
+
+.dd-status.pending {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+/* ════════════════════════════════════════════════════════
+   DESCRIPTION / CONTENT
+════════════════════════════════════════════════════════ */
 
 .dd-workspace-description {
   line-clamp: unset;
   -webkit-line-clamp: unset;
+  line-height: 1.7;
+  color: var(--text-2);
+  font-size: 14px;
 }
 
-.dd-workspace-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.dd-workspace-progress {
-  height: 10px;
-  border-radius: 999px;
-  background: var(--surface-3);
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-
-.dd-workspace-progress-fill {
-  width: 45%;
-  height: 100%;
-  background: linear-gradient(135deg, var(--cyan), var(--violet));
-  box-shadow: 0 0 12px var(--cyan-glow);
-}
-
-@media (max-width: 900px) {
-  .dd-workspace-body {
-    grid-template-columns: 1fr;
-  }
-}
-
-.dd-workspace .dd-card:hover {
-  transform: translateY(-4px);
-}
+/* ════════════════════════════════════════════════════════
+   INPUTS
+════════════════════════════════════════════════════════ */
 
 .dd-input {
   width: 100%;
-  padding: 10px;
-  margin-top: 10px;
-  border-radius: 8px;
+  padding: 10px 13px;
+  margin-top: 0;
+  border-radius: 9px;
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-2, var(--surface));
   color: var(--text);
   font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+.dd-input::placeholder {
+  color: var(--text-3, rgba(122, 132, 156, 0.5));
 }
 
 .dd-input:focus {
   outline: none;
-  border-color: var(--cyan);
-  box-shadow: 0 0 0 1px var(--cyan);
+  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
+  box-shadow: 0 0 0 3px var(--cyan-dim, rgba(6, 182, 212, 0.1));
 }
 
-/* Upload container */
-.dd-file-upload {
-  display: inline-block;
-  cursor: pointer;
+.dd-input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
-/* Button style */
-.dd-file-btn {
-  display: inline-block;
-  padding: 10px 16px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--cyan), var(--violet));
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  transition: all 0.25s ease;
-  box-shadow: 0 0 12px var(--cyan-glow);
+textarea.dd-input {
+  min-height: 80px;
+  resize: vertical;
+  line-height: 1.6;
 }
 
-/* Hover effect */
-.dd-file-btn:hover {
-  transform: translateY(-2px) scale(1.03);
-  box-shadow: 0 0 18px var(--cyan-glow);
-}
-
-/* File name display */
-.dd-file-name {
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--text-2);
-  word-break: break-all;
-}
-
-/* Button */
-.dd-file-btn {
-  display: inline-block;
-  padding: 10px 16px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--cyan), var(--violet));
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  box-shadow: 0 0 12px var(--cyan-glow);
-}
-
-/* Hover */
-.dd-file-btn:hover {
-  transform: translateY(-2px) scale(1.03);
-}
-
-/* Click effect 🔥 */
-.dd-file-btn:active {
-  transform: scale(0.95);
-  box-shadow: 0 0 6px var(--cyan-glow);
-}
-
-/* Button */
-.dd-file-btn {
-  display: inline-block;
-  padding: 10px 16px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--cyan), var(--violet));
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  box-shadow: 0 0 12px var(--cyan-glow);
-}
-
-/* Hover */
-.dd-file-btn:hover {
-  transform: translateY(-2px) scale(1.03);
-}
-
-/* Click effect 🔥 */
-.dd-file-btn:active {
-  transform: scale(0.95);
-  box-shadow: 0 0 6px var(--cyan-glow);
-}
-
-.dd-file-link {
-  display: inline-block;
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--cyan);
-  text-decoration: none;
-  transition: all 0.2s ease;
-}
-
-.dd-file-link:hover {
-  text-decoration: underline;
-  color: var(--violet);
-}
+/* ════════════════════════════════════════════════════════
+   FILE SYSTEM
+════════════════════════════════════════════════════════ */
 
 .dd-file-input {
   display: none;
@@ -200,8 +200,8 @@
 .dd-file-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 7px;
+  margin-top: 10px;
 }
 
 .dd-file-item {
@@ -209,11 +209,18 @@
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: var(--surface-2);
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: var(--surface-2, var(--surface));
   border: 1px solid var(--border);
   cursor: grab;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.dd-file-item:hover {
+  border-color: var(--border-hi, rgba(255, 255, 255, 0.1));
+  background: color-mix(in srgb, var(--surface-2, var(--surface)) 80%, var(--cyan) 5%);
+  transform: translateX(2px);
 }
 
 .dd-file-item:active {
@@ -226,34 +233,182 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  max-width: none;
+}
+
+.dd-file-link {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--cyan);
+  text-decoration: none;
+  transition: color 0.18s ease, opacity 0.18s ease;
+  max-width: 200px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dd-file-link:hover {
+  color: var(--violet);
+  text-decoration: underline;
 }
 
 .dd-file-delete {
   background: transparent;
-  border: none;
-  color: #ff5c5c;
+  border: 1px solid transparent;
+  color: var(--text-2);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 12px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+  padding: 0;
 }
 
+.dd-file-delete:hover {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.28);
+  color: #f87171;
+}
+
+/* ── Upload progress bar ───────────────────────────── */
 .dd-upload-progress {
-  height: 6px;
-  background: var(--surface-3);
+  height: 4px;
+  background: var(--surface-3, var(--border));
   border-radius: 999px;
-  margin-top: 10px;
+  margin-top: 12px;
   overflow: hidden;
 }
 
 .dd-upload-progress-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--cyan), var(--violet));
+  box-shadow: 0 0 8px var(--cyan-glow, rgba(6, 182, 212, 0.4));
   transition: width 0.2s ease;
+  border-radius: 999px;
 }
 
-.dd-file-link {
-  max-width: 200px;
+/* ════════════════════════════════════════════════════════
+   DELIVERABLES CARD
+════════════════════════════════════════════════════════ */
+
+.dd-deliverables {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dd-deliverables .dd-input {
+  background: var(--surface-2, var(--surface));
+}
+
+.dd-deliverables textarea.dd-input {
+  min-height: 72px;
+}
+
+.dd-deliverables .dd-bid-btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* ════════════════════════════════════════════════════════
+   PROGRESS BAR
+════════════════════════════════════════════════════════ */
+
+.dd-workspace-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-3, var(--border));
+  border: 1px solid var(--border);
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  display: inline-block;
+  margin-top: 8px;
+}
+
+.dd-workspace-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan), var(--violet));
+  box-shadow: 0 0 12px var(--cyan-glow, rgba(6, 182, 212, 0.35));
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ════════════════════════════════════════════════════════
+   CARD HOVER LIFT (workspace scope)
+════════════════════════════════════════════════════════ */
+
+.dd-workspace .dd-card {
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.22s ease,
+              border-color 0.22s ease;
+}
+
+.dd-workspace-left > .dd-card:hover,
+.dd-workspace-actions > .dd-card:hover {
+  transform: translateY(-3px);
+}
+
+/* ════════════════════════════════════════════════════════
+   RESPONSIVE
+════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .dd-workspace-body {
+    grid-template-columns: 1fr 340px;
+  }
+}
+
+@media (max-width: 900px) {
+  .dd-workspace-body {
+    grid-template-columns: 1fr;
+  }
+
+  .dd-workspace-actions {
+    position: static;
+  }
+}
+
+@media (max-width: 600px) {
+  .dd-workspace-header {
+    padding: 16px 16px 18px;
+  }
+
+  .dd-workspace-title-row .dd-card-title {
+    font-size: 18px;
+  }
+
+  .dd-workspace-meta {
+    gap: 12px;
+    font-size: 11.5px;
+  }
+}
+
+.dd-clean-zone {
+  position: relative;
+  z-index: 10;
+
+  display: block;
+}
+
+.dd-workspace-safe {
+  position: relative;
+  transform: none !important;
+  isolation: isolate;
+  will-change: auto;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.dd-workspace-safe * {
+  transform: none !important;
+}
+.dd-workspace-left > * {
+  min-width: 0;
 }

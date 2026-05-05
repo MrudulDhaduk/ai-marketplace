@@ -58,12 +58,10 @@
   border-radius: inherit;
   pointer-events: none;
   opacity: 0.65;
-  background: linear-gradient(
-    115deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.05) 14%,
-    transparent 28%
-  );
+  background: linear-gradient(115deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.05) 14%,
+      transparent 28%);
   transform: translateX(-35%) skewX(-12deg);
   mix-blend-mode: screen;
   animation: modal-sweep 6.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
@@ -85,17 +83,13 @@
   border-radius: 16px;
 
   background:
-    linear-gradient(
-      180deg,
+    linear-gradient(180deg,
       color-mix(in srgb, var(--surface) 76%, transparent),
-      color-mix(in srgb, var(--bg) 70%, transparent)
-    ),
-    linear-gradient(
-      90deg,
+      color-mix(in srgb, var(--bg) 70%, transparent)),
+    linear-gradient(90deg,
       transparent 0%,
       color-mix(in srgb, var(--cyan) 6%, transparent) 45%,
-      transparent 100%
-    );
+      transparent 100%);
   background-size: 100% 100%, 240% 100%;
   background-position: 0 0, 0% 0;
 
@@ -157,11 +151,7 @@
 
 .bid-card:hover {
   transform:
-    translateY(-5px)
-    scale(1.015)
-    perspective(900px)
-    rotateX(2.2deg)
-    rotateY(-2.6deg);
+    translateY(-5px) scale(1.015) perspective(900px) rotateX(2.2deg) rotateY(-2.6deg);
 
   background-position: 0 0, 100% 0;
   border-color: color-mix(in srgb, var(--cyan) 48%, rgba(255, 255, 255, 0.12));
@@ -246,7 +236,7 @@
   transform: scale(1.02);
 }
 
-.modal-content > button {
+.modal-content>button {
   width: 100%;
   margin-top: 14px;
   padding: 10px;
@@ -258,13 +248,13 @@
   transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
-.modal-content > button:hover {
+.modal-content>button:hover {
   border-color: var(--cyan);
   color: var(--cyan);
   transform: translateY(-1px);
 }
 
-.modal-content > button:active {
+.modal-content>button:active {
   transform: translateY(0);
 }
 
@@ -285,11 +275,9 @@
 }
 
 .modal-content::-webkit-scrollbar-thumb {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--cyan) 32%, transparent),
-    color-mix(in srgb, var(--cyan-glow) 26%, transparent)
-  );
+  background: linear-gradient(180deg,
+      color-mix(in srgb, var(--cyan) 32%, transparent),
+      color-mix(in srgb, var(--cyan-glow) 26%, transparent));
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -302,11 +290,9 @@
 
 .modal-content:hover::-webkit-scrollbar-thumb {
   opacity: 0.92;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--cyan) 46%, transparent),
-    color-mix(in srgb, var(--cyan-glow) 38%, transparent)
-  );
+  background: linear-gradient(180deg,
+      color-mix(in srgb, var(--cyan) 46%, transparent),
+      color-mix(in srgb, var(--cyan-glow) 38%, transparent));
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--cyan) 26%, transparent),
     0 0 22px color-mix(in srgb, var(--cyan-glow) 26%, transparent);
@@ -314,45 +300,100 @@
 
 /* ===== Animations ===== */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes modal-aurora {
-  0%, 100% { transform: translateY(0) scale(1); opacity: 0.7; }
-  50% { transform: translateY(-6px) scale(1.02); opacity: 0.88; }
+
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: translateY(-6px) scale(1.02);
+    opacity: 0.88;
+  }
 }
 
 @keyframes modal-sweep {
-  0% { transform: translateX(-45%) skewX(-12deg); opacity: 0; }
-  18% { opacity: 0.75; }
-  52% { opacity: 0.35; }
-  100% { transform: translateX(45%) skewX(-12deg); opacity: 0; }
+  0% {
+    transform: translateX(-45%) skewX(-12deg);
+    opacity: 0;
+  }
+
+  18% {
+    opacity: 0.75;
+  }
+
+  52% {
+    opacity: 0.35;
+  }
+
+  100% {
+    transform: translateX(45%) skewX(-12deg);
+    opacity: 0;
+  }
 }
 
 @keyframes bid-card-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes bid-landing {
-  0% { filter: blur(6px); transform: translateY(14px) scale(0.98); }
-  70% { filter: blur(0.5px); transform: translateY(-2px) scale(1.01); }
-  100% { filter: blur(0px); transform: translateY(0) scale(1); }
+  0% {
+    filter: blur(6px);
+    transform: translateY(14px) scale(0.98);
+  }
+
+  70% {
+    filter: blur(0.5px);
+    transform: translateY(-2px) scale(1.01);
+  }
+
+  100% {
+    filter: blur(0px);
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes bid-idle-breathe {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow:
       0 18px 46px rgba(0, 0, 0, 0.55),
       0 1px 0 rgba(255, 255, 255, 0.06) inset,
       0 0 0 1px color-mix(in srgb, var(--cyan-dim) 10%, transparent);
   }
+
   50% {
     box-shadow:
       0 20px 52px rgba(0, 0, 0, 0.58),
@@ -363,33 +404,73 @@
 }
 
 @keyframes card-glow-breathe {
-  0%, 100% { opacity: 0.58; filter: blur(10px); }
-  50% { opacity: 0.82; filter: blur(12px); }
+
+  0%,
+  100% {
+    opacity: 0.58;
+    filter: blur(10px);
+  }
+
+  50% {
+    opacity: 0.82;
+    filter: blur(12px);
+  }
 }
 
 @keyframes card-glow-drift {
-  0% { background-position: 0% 0%, 100% 100%; }
-  100% { background-position: 100% 0%, 0% 100%; }
+  0% {
+    background-position: 0% 0%, 100% 100%;
+  }
+
+  100% {
+    background-position: 100% 0%, 0% 100%;
+  }
 }
 
 @keyframes bid-shine {
-  from { transform: translateX(-24%) skewX(-10deg); }
-  to { transform: translateX(52%) skewX(-10deg); }
+  from {
+    transform: translateX(-24%) skewX(-10deg);
+  }
+
+  to {
+    transform: translateX(52%) skewX(-10deg);
+  }
 }
 
 @keyframes card-reflect-drift {
-  0%, 100% { transform: translateX(-10%) skewX(-10deg); }
-  50% { transform: translateX(10%) skewX(-10deg); }
+
+  0%,
+  100% {
+    transform: translateX(-10%) skewX(-10deg);
+  }
+
+  50% {
+    transform: translateX(10%) skewX(-10deg);
+  }
 }
 
 @keyframes amount-flicker {
-  0%, 100% { opacity: 1; }
-  48% { opacity: 0.94; }
-  50% { opacity: 1; }
-  52% { opacity: 0.97; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  48% {
+    opacity: 0.94;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  52% {
+    opacity: 0.97;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .modal-overlay,
   .modal-content,
   .modal-content::before,
@@ -400,9 +481,29 @@
   .bid-card p:nth-of-type(2) {
     animation: none !important;
   }
+
   .bid-card,
   .bid-card button,
-  .modal-content > button {
+  .modal-content>button {
     transition: none !important;
   }
+}
+
+.accepted-btn {
+  background: var(--cyan);
+  color: #000;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.disabled-btn {
+  background: var(--surface-3);
+  color: var(--text-2);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  opacity: 0.6;
+  cursor: not-allowed;
 }

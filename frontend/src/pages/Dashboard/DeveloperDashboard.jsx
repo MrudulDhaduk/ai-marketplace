@@ -6,8 +6,10 @@ import Background from "../../components/Background";
 import ProjectFeed from "../sections/ProjectFeed";
 import ActiveBids from "../sections/ActiveBids";
 import MyProjects from "../sections/MyProjects";
-import ProjectWorkspace from "../sections/ProjectWorkspace";
+import ProjectWorkspace from "../sections/DeveloperProjectWorkspace";
 import { useMousePos, useRipple } from "../hooks";
+import React from "react";  
+
 
 const DUMMY_PROJECTS = [
   {
@@ -80,6 +82,8 @@ const DUMMY_PROJECTS = [
 
 const ALL_TAGS = [...new Set(DUMMY_PROJECTS.flatMap((p) => p.tags))].sort();
 
+
+const MemoBackground = React.memo(Background);
 export default function DeveloperDashboard() {
   const user = (() => {
     try {
@@ -107,6 +111,7 @@ export default function DeveloperDashboard() {
   const mousePos = useMousePos();
   const shellRef = useRef(null);
 
+
   useRipple(shellRef);
   // projects feed fetch
   useEffect(() => {
@@ -116,7 +121,13 @@ export default function DeveloperDashboard() {
       const url = `http://localhost:5000/projects/discover/${sessionUser.id}?all=${showAll}`;
       console.log("Fetching projects from:", url);
       try {
-        const res = await fetch(url);
+        const token = localStorage.getItem("token");
+
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
         if (!res.ok) throw new Error("fetch failed");
         const data = await res.json();
         console.log("Projects fetched:", data);
@@ -138,8 +149,15 @@ export default function DeveloperDashboard() {
       try {
         const sessionUser = JSON.parse(localStorage.getItem("user"));
 
+        const token = localStorage.getItem("token");
+
         const res = await fetch(
           `http://localhost:5000/projects/assigned/${sessionUser.id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
         );
 
         if (!res.ok) throw new Error("fetch failed");
@@ -166,8 +184,15 @@ export default function DeveloperDashboard() {
       try {
         const user = JSON.parse(localStorage.getItem("user"));
 
+        const token = localStorage.getItem("token");
+
         const res = await fetch(
           `http://localhost:5000/bids/developer/${user.id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
         );
 
         const data = await res.json();
@@ -187,74 +212,75 @@ export default function DeveloperDashboard() {
   }, []);
 
   return (
-    <div ref={shellRef} className="dd-shell">
-      <Background mousePos={mousePos} />
-
+    <div className="developer-theme">
       <TopBar
         search={search}
         onSearch={setSearch}
         total={projects.length}
         filtered={filteredCount}
       />
+      <div ref={shellRef} className="dd-shell">
+        <MemoBackground mousePos={mousePos} />
 
-      <div className="dd-body">
-        <DevSidebar
-          user={user}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-        />
+        <div className="dd-body">
+          <DevSidebar
+            user={user}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+          />
 
-        <div className="dd-main">
-          {activeProject ? (
-            <ProjectWorkspace
-              project={activeProject}
-              onBack={() => setActiveProject(null)}
-              onComplete={(updatedProject) => {
-                setAssignedProjects((prev) =>
-                  prev.map((p) =>
-                    p.id === updatedProject.id ? updatedProject : p,
-                  ),
-                );
-              }}
-            />
-          ) : (
-            <>
-              {activeTab === "feed" && (
-                <ProjectFeed
-                  projects={projects}
-                  loading={loading}
-                  search={search}
-                  setSearch={setSearch}
-                  budget={budget}
-                  setBudget={setBudget}
-                  tags={tags}
-                  setTags={setTags}
-                  showAll={showAll}
-                  setShowAll={setShowAll}
-                  view={view}
-                  setView={setView}
-                  selectedProject={selectedProject}
-                  setSelectedProject={setSelectedProject}
-                  allTags={ALL_TAGS}
-                  setFilteredCount={setFilteredCount}
-                />
-              )}
+          <div className="dd-main">
+            {activeProject ? (
+              <ProjectWorkspace
+                project={activeProject}
+                onBack={() => setActiveProject(null)}
+                onComplete={(updatedProject) => {
+                  setAssignedProjects((prev) =>
+                    prev.map((p) =>
+                      p.id === updatedProject.id ? updatedProject : p,
+                    ),
+                  );
+                }}
+              />
+            ) : (
+              <>
+                {activeTab === "feed" && (
+                  <ProjectFeed
+                    projects={projects}
+                    loading={loading}
+                    search={search}
+                    setSearch={setSearch}
+                    budget={budget}
+                    setBudget={setBudget}
+                    tags={tags}
+                    setTags={setTags}
+                    showAll={showAll}
+                    setShowAll={setShowAll}
+                    view={view}
+                    setView={setView}
+                    selectedProject={selectedProject}
+                    setSelectedProject={setSelectedProject}
+                    allTags={ALL_TAGS}
+                    setFilteredCount={setFilteredCount}
+                  />
+                )}
 
-              {activeTab === "active" && (
-                <ActiveBids
-                  bids={myBids}
-                  view={bidsView}
-                  setView={setBidsView}
-                />
-              )}
-              {activeTab === "my-projects" && (
-                <MyProjects
-                  assignedProjects={assignedProjects}
-                  onOpenProject={setActiveProject}
-                />
-              )}
-            </>
-          )}
+                {activeTab === "active" && (
+                  <ActiveBids
+                    bids={myBids}
+                    view={bidsView}
+                    setView={setBidsView}
+                  />
+                )}
+                {activeTab === "my-projects" && (
+                  <MyProjects
+                    assignedProjects={assignedProjects}
+                    onOpenProject={setActiveProject}
+                  />
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

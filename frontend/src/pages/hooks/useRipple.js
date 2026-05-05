@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-export default function useRipple(ref) {
+export default function useRipple(ref, rippleClassName = "dd-ripple") {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -11,7 +11,7 @@ export default function useRipple(ref) {
       const rect = target.getBoundingClientRect();
       const size = Math.max(rect.width, rect.height) * 1.6;
       const wave = document.createElement("span");
-      wave.className = "dd-ripple";
+      wave.className = rippleClassName;
       wave.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - rect.left - size / 2}px;top:${e.clientY - rect.top - size / 2}px`;
       target.appendChild(wave);
       wave.addEventListener("animationend", () => wave.remove(), {
@@ -21,5 +21,5 @@ export default function useRipple(ref) {
 
     el.addEventListener("click", handler);
     return () => el.removeEventListener("click", handler);
-  }, [ref]);
+  }, [ref, rippleClassName]);
 }

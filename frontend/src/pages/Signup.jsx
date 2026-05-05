@@ -312,13 +312,9 @@ function Signup() {
       }
       const data = await res.json();
 
-      // store auth data
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data));
-
       console.log(data);
       // redirect
-      navigate("/dashboard");
+      navigate("/login");
     } catch (err) {
       console.error(err);
     }
