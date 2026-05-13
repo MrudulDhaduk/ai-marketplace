@@ -22,7 +22,6 @@ export default function MyProjects({ assignedProjects, onOpenProject }) {
               <span>
                 ₹{p.min_budget} – ₹{p.max_budget}
               </span>
-
               <span
                 className={`dd-status ${
                   p.status === "active" ? "active" : "completed"
