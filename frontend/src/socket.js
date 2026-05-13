@@ -1,8 +1,18 @@
 import { io } from "socket.io-client";
+import { getToken, isTokenExpired } from "./api";
 
-// Single shared Socket.IO client instance for the app.
-// URL defaults to the API server on localhost:5000.
-export const socket = io(process.env.REACT_APP_SOCKET_URL || "http://localhost:5000", {
+const socketUrl = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL || window.location.origin;
+
+export const socket = io(socketUrl, {
   transports: ["websocket"],
+  autoConnect: true,
+  auth: (cb) => {
+    const token = getToken();
+    cb({ token: token && !isTokenExpired(token) ? token : undefined });
+  },
 });
 
+export function connectSocket() {
+  if (!socket.connected) socket.connect();
+  return socket;
+}
