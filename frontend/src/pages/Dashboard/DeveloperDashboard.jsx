@@ -8,7 +8,8 @@ import ActiveBids from "../sections/ActiveBids";
 import MyProjects from "../sections/MyProjects";
 import ProjectWorkspace from "../sections/DeveloperProjectWorkspace";
 import { useMousePos, useRipple } from "../hooks";
-import React from "react";  
+import React from "react";
+import { apiRequest } from "../../api";
 
 
 const DUMMY_PROJECTS = [
@@ -113,101 +114,59 @@ export default function DeveloperDashboard() {
 
 
   useRipple(shellRef);
+
   // projects feed fetch
   useEffect(() => {
+    if (!user?.id) return;
     const fetchProjects = async () => {
       setLoading(true);
-      const sessionUser = JSON.parse(localStorage.getItem("user"));
-      const url = `http://localhost:5000/projects/discover/${sessionUser.id}?all=${showAll}`;
-      console.log("Fetching projects from:", url);
       try {
-        const token = localStorage.getItem("token");
-
-        const res = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const res = await apiRequest(`/projects/discover/${user.id}?all=${showAll}`);
         if (!res.ok) throw new Error("fetch failed");
         const data = await res.json();
-        console.log("Projects fetched:", data);
-        setProjects(data || []);
+        // Support paginated { data: [] } and legacy flat array
+        const rows = Array.isArray(data) ? data : (data.data ?? []);
+        setProjects(rows);
       } catch {
         setProjects([]);
       } finally {
         setLoading(false);
       }
     };
-
     fetchProjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAll]);
 
   // assigned projects fetch
   useEffect(() => {
+    if (!user?.id) return;
     const fetchAssigned = async () => {
       try {
-        const sessionUser = JSON.parse(localStorage.getItem("user"));
-
-        const token = localStorage.getItem("token");
-
-        const res = await fetch(
-          `http://localhost:5000/projects/assigned/${sessionUser.id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-
+        const res = await apiRequest(`/projects/assigned/${user.id}`);
         if (!res.ok) throw new Error("fetch failed");
-
         const data = await res.json();
-        if (Array.isArray(data)) {
-          setAssignedProjects(data);
-        } else {
-          console.error("Invalid assignedProjects response:", data);
-          setAssignedProjects([]);
-        }
-      } catch (err) {
-        console.error(err);
+        setAssignedProjects(Array.isArray(data) ? data : []);
+      } catch {
         setAssignedProjects([]);
       }
     };
-
     fetchAssigned();
   }, []);
 
-  // my bids fetch (developer-specific)
+  // my bids fetch
   useEffect(() => {
+    if (!user?.id) return;
     const fetchBids = async () => {
       try {
-        const user = JSON.parse(localStorage.getItem("user"));
-
-        const token = localStorage.getItem("token");
-
-        const res = await fetch(
-          `http://localhost:5000/bids/developer/${user.id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-
+        const res = await apiRequest(`/bids/developer/${user.id}`);
         const data = await res.json();
-
-        if (Array.isArray(data)) {
-          setMyBids(data);
-        } else {
-          setMyBids([]);
-        }
-      } catch (err) {
-        console.error(err);
+        // Support paginated { data: [] } and legacy flat array
+        const rows = Array.isArray(data) ? data : (data.data ?? []);
+        setMyBids(rows);
+      } catch {
         setMyBids([]);
       }
     };
-
     fetchBids();
   }, []);
 

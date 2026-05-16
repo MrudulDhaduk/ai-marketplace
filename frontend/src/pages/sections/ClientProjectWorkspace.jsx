@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import "./ProjectWorkspace.css";
 import { socket } from "../../socket";
 import SubmissionHistory from "./components/SubmissionHistory";
+import { apiRequest } from "../../api";
 
 /* ─── constants ─────────────────────────────────────────── */
 const STATUS_META = {
@@ -188,9 +189,7 @@ export default function ClientProjectWorkspace({ project, onBack }) {
       setLoadingFiles(true);
       setError("");
       try {
-        const res = await fetch(`http://localhost:5000/projects/${project.id}/files`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const res = await apiRequest(`/projects/${project.id}/files`);
         if (!res.ok) throw new Error(`Failed to fetch files: ${res.status}`);
         const data = await res.json();
         if (!cancelled) setFiles(Array.isArray(data) ? data : []);
@@ -211,9 +210,7 @@ export default function ClientProjectWorkspace({ project, onBack }) {
       setLoadingDeliverables(true);
       setError("");
       try {
-        const res = await fetch(`http://localhost:5000/api/projects/${project.id}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const res = await apiRequest(`/api/projects/${project.id}`);
         if (!res.ok) throw new Error(`Failed to fetch project deliverables: ${res.status}`);
         const found = await res.json();
         if (cancelled) return;
@@ -247,9 +244,7 @@ export default function ClientProjectWorkspace({ project, onBack }) {
 
     const handleProjectSubmitted = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/projects/${project.id}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const res = await apiRequest(`/api/projects/${project.id}`);
         if (!res.ok) return;
         const data = await res.json();
         setDeliverables({
@@ -268,9 +263,7 @@ export default function ClientProjectWorkspace({ project, onBack }) {
     };
 
     const handleProjectReviewed = async () => {
-      const res = await fetch(`http://localhost:5000/api/projects/${project.id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const res = await apiRequest(`/api/projects/${project.id}`);
       if (!res.ok) return;
       const updated = await res.json();
       setDeliverables({
@@ -302,11 +295,7 @@ export default function ClientProjectWorkspace({ project, onBack }) {
     setReviewLoading(true);
     setError("");
     try {
-      const res = await fetch(`http://localhost:5000/projects/${project.id}/review`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action, feedback: reviewFeedback }),
-      });
+      const res = await apiRequest(`/projects/${project.id}/review`, { method: "PUT", body: JSON.stringify({ action, feedback: reviewFeedback }) });
       if (!res.ok) throw new Error(`Failed to submit review: ${res.status}`);
       const data = await res.json();
       setReviewStatus(data.project.review_status);
@@ -336,10 +325,7 @@ export default function ClientProjectWorkspace({ project, onBack }) {
         flashAction("💬 Opening message thread…");
       }
       if (actionKey === "request_update") {
-        await fetch(`http://localhost:5000/projects/${project.id}/request-update`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        }).catch(() => {}); // graceful if endpoint not yet live
+        await apiRequest(`/projects/${project.id}/request-update`, { method: "POST", body: JSON.stringify({ action: "revision", feedback: "Update requested by client" }) }).catch(() => {}); // graceful if endpoint not yet live
         flashAction("📣 Update requested — developer has been notified.");
       }
       if (actionKey === "urgent") {

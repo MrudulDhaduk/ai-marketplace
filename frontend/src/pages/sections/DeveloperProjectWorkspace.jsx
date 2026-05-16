@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { socket } from "../../socket";
 import SubmissionHistory from "./components/SubmissionHistory";
 import React from "react";
+import { apiRequest, API_BASE_URL } from "../../api";
 
 /* ── helpers ─────────────────────────────────────────── */
 const timeAgo = (dateStr) => {
@@ -88,9 +89,7 @@ function DeveloperProjectWorkspace({ project, onBack }) {
     if (!project?.id) return;
     (async () => {
       try {
-        const r = await fetch(`http://localhost:5000/projects/${project.id}/files`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const r = await apiRequest(`/projects/${project.id}/files`);
         if (!r.ok) return;
         setFiles(await r.json());
       } catch (e) { console.error("Failed to fetch files", e); }
@@ -102,9 +101,7 @@ function DeveloperProjectWorkspace({ project, onBack }) {
     if (!project?.id) return;
     (async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/projects/${project.id}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const res = await apiRequest(`/api/projects/${project.id}`);
         if (!res.ok) { setSubmissionError("Failed to load project data"); return; }
         const data = await res.json();
         setRepoLink(data?.deliverable_link || "");
@@ -128,9 +125,7 @@ function DeveloperProjectWorkspace({ project, onBack }) {
 
     const refresh = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/projects/${project.id}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const res = await apiRequest(`/api/projects/${project.id}`);
         if (!res.ok) return;
         const data = await res.json();
         setReviewStatus(data?.review_status || "pending");
@@ -145,9 +140,7 @@ function DeveloperProjectWorkspace({ project, onBack }) {
       setActiveTab("feedback");
     };
     const handleProjectSubmitted = async () => {
-      const res = await fetch(`http://localhost:5000/api/projects/${project.id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const res = await apiRequest(`/api/projects/${project.id}`);
       if (!res.ok) return;
       const data = await res.json();
       setRepoLink(data?.deliverable_link || "");
@@ -170,10 +163,7 @@ function DeveloperProjectWorkspace({ project, onBack }) {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this file?")) return;
     try {
-      const delRes = await fetch(`http://localhost:5000/files/${id}`, {
-        method: "DELETE",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const delRes = await apiRequest(`/files/${id}`, { method: "DELETE" });
       if (!delRes.ok) return;
       setFiles((prev) => prev.filter((f) => f.id !== id));
       pushNotif("🗑️ File deleted", "info");
@@ -189,11 +179,7 @@ function DeveloperProjectWorkspace({ project, onBack }) {
     setFiles(updated);
     setDragIndex(null);
     setDragOver(null);
-    fetch("http://localhost:5000/files/reorder", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify(updated.map((f, i) => ({ id: f.id, position: i }))),
-    }).catch((e) => console.error("Failed to reorder files", e));
+    apiRequest("/files/reorder", { method: "PUT", body: JSON.stringify(updated.map((f, i) => ({ id: f.id, position: i + 1 }))) }).catch((e) => console.error("Failed to reorder files", e));
   };
 
   /* ── upload ──────────────────────────────────────────── */
@@ -221,7 +207,7 @@ function DeveloperProjectWorkspace({ project, onBack }) {
       if (fileInputRef.current) fileInputRef.current.value = "";
     };
     xhr.onerror = () => { setUploadProgress(0); console.error("Upload request failed"); };
-    xhr.open("POST", `http://localhost:5000/projects/${project.id}/upload`);
+    xhr.open("POST", `${API_BASE_URL}/projects/${project.id}/upload`);
     if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     xhr.send(formData);
   };
@@ -259,11 +245,7 @@ function DeveloperProjectWorkspace({ project, onBack }) {
     setSubmissionState("submitting");
     setShowConfirm(false);
     try {
-      const res = await fetch(`http://localhost:5000/projects/${project.id}/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ repoLink, demoLink, notes }),
-      });
+      const res = await apiRequest(`/projects/${project.id}/submit`, { method: "POST", body: JSON.stringify({ repoLink, demoLink, notes }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setSubmissionState("submitted");

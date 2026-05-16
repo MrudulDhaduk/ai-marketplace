@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import "./ProjectBidsModal.css";
+import { apiRequest } from "../api";
+
 export default function ProjectBidsModal({ project, onClose }) {
   const [bids, setBids] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const token = localStorage.getItem("token");
 
   useEffect(() => {
     fetchBids();
@@ -12,24 +12,12 @@ export default function ProjectBidsModal({ project, onClose }) {
 
   const fetchBids = async () => {
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/projects/${project.id}/bids`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
+      const res = await apiRequest(`/api/projects/${project.id}/bids`);
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setBids(data);
-      } else {
-        console.error("Unexpected response:", data);
-        setBids([]); // fallback to empty
-      }
-    } catch (err) {
-      console.error(err);
+      const rows = Array.isArray(data) ? data : (data.data ?? []);
+      setBids(rows);
+    } catch {
+      setBids([]);
     } finally {
       setLoading(false);
     }
@@ -37,19 +25,13 @@ export default function ProjectBidsModal({ project, onClose }) {
 
   const acceptBid = async (bidId) => {
     try {
-      await fetch(
-        `http://localhost:5000/api/projects/${project.id}/accept-bid/${bidId}`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
+      await apiRequest(
+        `/api/projects/${project.id}/accept-bid/${bidId}`,
+        { method: "POST" }
       );
-
-      fetchBids(); // refresh
-    } catch (err) {
-      console.error(err);
+      fetchBids();
+    } catch {
+      // ignore
     }
   };
   const hasAccepted = bids.some((b) => b.status === "accepted");

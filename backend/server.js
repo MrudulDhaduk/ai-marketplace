@@ -7,6 +7,7 @@ const { applySecurity, corsOptions } = require("./middleware/security");
 const createRoutes = require("./routes");
 const setupSockets = require("./sockets");
 const { uploadDir } = require("./services/uploadService");
+const logger = require("./utils/logger");
 
 const app = express();
 const server = http.createServer(app);
@@ -22,13 +23,13 @@ app.use("/uploads", express.static(uploadDir, { dotfiles: "deny", index: false, 
 
 app.use((err, req, res, next) => {
   if (err.message === "Not allowed by CORS") return res.status(403).json({ message: "CORS origin denied" });
-  console.error(err);
+  logger.error("Unhandled request error", err);
   res.status(500).json({ message: "Internal server error" });
 });
 
 if (require.main === module) {
   server.listen(config.port, () => {
-    console.log(`Server running on port ${config.port}`);
+    logger.info("Server running", { port: config.port });
   });
 }
 

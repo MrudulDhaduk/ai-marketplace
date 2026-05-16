@@ -11,6 +11,7 @@ import ClientProjectsPanel from "../sections/ClientProjectsPanel";
 import ClientMessages from "../sections/ClientMessages";
 import ClientPayments from "../sections/ClientPayments";
 import ClientProjectWorkspace from "../sections/ClientProjectWorkspace";
+import { apiRequest } from "../../api";
 
 function formatProjectForCard(p) {
   const hasBudgetText = typeof p.budget === "string" && p.budget.trim();
@@ -75,13 +76,7 @@ export default function ClientDashboard() {
 
     const fetchProjects = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const response = await fetch("http://localhost:5000/api/projects", {
-          headers: token
-            ? {
-                Authorization: `Bearer ${token}`,
-              }
-            : {},
+        const response = await apiRequest("/api/projects", {
           signal: controller.signal,
         });
 
@@ -90,11 +85,9 @@ export default function ClientDashboard() {
         }
 
         const data = await response.json();
-        setProjects(
-          Array.isArray(data)
-            ? data.map((project) => formatProjectForCard(project))
-            : [],
-        );
+        // Support both paginated { data: [] } and legacy flat array responses
+        const rows = Array.isArray(data) ? data : (data.data ?? []);
+        setProjects(rows.map((project) => formatProjectForCard(project)));
       } catch (error) {
         if (error.name !== "AbortError") {
           console.error("Error fetching projects:", error);

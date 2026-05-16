@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import "./Profile.css";
 import TopBar from "../components/TopBar";
+import { apiRequest, getToken } from "../api";
 
 /* ========== Profile Header ========== */
 function ProfileHeader({ user, isOwner }) {
@@ -140,13 +141,10 @@ function SkillsSection({ skills, setSkills, isOwner, userId }) {
     if (!trimmedSkill || skills.includes(trimmedSkill)) return;
 
     try {
-      const resp = await fetch(
-        `http://localhost:5000/profile/${userId}/skills`,
+      const resp = await apiRequest(
+        `/profile/${userId}/skills`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({ skill: trimmedSkill }),
         }
       );
@@ -162,13 +160,10 @@ function SkillsSection({ skills, setSkills, isOwner, userId }) {
 
   const handleRemoveSkill = async (skillToRemove) => {
     try {
-      const resp = await fetch(
-        `http://localhost:5000/profile/${userId}/skills`,
+      const resp = await apiRequest(
+        `/profile/${userId}/skills`,
         {
           method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({ skill: skillToRemove }),
         }
       );
@@ -334,7 +329,7 @@ export default function Profile() {
           return;
         }
         setUserId(userObj.id);
-        const resp = await fetch(`http://localhost:5000/profile/${userObj.id}`);
+        const resp = await apiRequest(`/profile/${userObj.id}`);
         if (!resp.ok) throw new Error("Profile fetch failed");
         const data = await resp.json();
         setProfile(data);
@@ -356,7 +351,7 @@ export default function Profile() {
         return;
       }
       try {
-        const resp = await fetch(`http://localhost:5000/profile/${userId}/skills`);
+        const resp = await apiRequest(`/profile/${userId}/skills`);
         if (!resp.ok) throw new Error("Skills fetch failed");
         const data = await resp.json();
         setSkills(data || []);

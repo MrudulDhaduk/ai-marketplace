@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import "../auth.css";
 import { useNavigate } from "react-router-dom";
+import { apiRequest } from "../api";
 
 const FIELDS = [
   {
@@ -295,9 +296,8 @@ function Signup() {
     }
     setErrors({});
     try {
-      const res = await fetch("http://localhost:5000/auth/signup", {
+      const res = await apiRequest("/auth/signup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
       if (!res.ok) {

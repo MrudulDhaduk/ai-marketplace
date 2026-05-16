@@ -16,6 +16,14 @@ const allowedMime = new Set([
   "application/x-zip-compressed",
 ]);
 const allowedExt = new Set([".pdf", ".png", ".jpg", ".jpeg", ".txt", ".zip"]);
+const mimeToExt = {
+  "application/pdf": new Set([".pdf"]),
+  "image/png": new Set([".png"]),
+  "image/jpeg": new Set([".jpg", ".jpeg"]),
+  "text/plain": new Set([".txt"]),
+  "application/zip": new Set([".zip"]),
+  "application/x-zip-compressed": new Set([".zip"]),
+};
 
 function safeExt(originalName) {
   const ext = path.extname(originalName || "").toLowerCase();
@@ -28,7 +36,8 @@ const storage = multer.diskStorage({
 });
 
 function fileFilter(req, file, cb) {
-  if (!allowedMime.has(file.mimetype) || !safeExt(file.originalname)) {
+  const ext = safeExt(file.originalname);
+  if (!allowedMime.has(file.mimetype) || !ext || !mimeToExt[file.mimetype]?.has(ext)) {
     return cb(new Error("Invalid file type"), false);
   }
   cb(null, true);

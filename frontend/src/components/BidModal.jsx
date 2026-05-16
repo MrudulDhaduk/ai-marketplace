@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import "./BidModal.css";
+import { apiRequest } from "../api";
 
 /* ─── icons ─────────────────────────────────────── */
 function IClose() {
@@ -156,19 +157,12 @@ export default function BidModal({ project, onClose }) {
     try {
       setLoading(true);
       setError("");
-      const token = localStorage.getItem("token");
-      const user = JSON.parse(localStorage.getItem("user"));
 
-      const res = await fetch(
-        `http://localhost:5000/projects/${project.id}/bid`,
+      const res = await apiRequest(
+        `/projects/${project.id}/bid`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
           body: JSON.stringify({
-            developerId: user?.id,
             amount: numAmount,
             proposal: proposal.trim(),
           }),

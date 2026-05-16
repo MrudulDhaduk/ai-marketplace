@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js",
     "check": "node --check backend/server.js && node --check backend/routes/index.js && node --check backend/sockets/index.js",
     "migrate:sql": "psql \"$DATABASE_URL\" -f backend/db/migrations/001_security_indexes.sql"
   },

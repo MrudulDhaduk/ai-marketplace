@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useFadeUp } from '../hooks/useFadeup';
+import { API_BASE_URL } from '../api';
 
-const API_URL = 'http://localhost:5000/projects';
+const API_URL = `${API_BASE_URL}/projects`;
 
 function ProjectCard({ project, onClick }) {
   return (
@@ -46,7 +47,7 @@ function Projects() {
         const res = await fetch(API_URL);
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         const data = await res.json();
-        setProjects(data);
+        setProjects(Array.isArray(data) ? data : data.data || []);
       } catch (err) {
         setError(err.message);
       } finally {

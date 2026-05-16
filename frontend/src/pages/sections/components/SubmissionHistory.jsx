@@ -3,6 +3,7 @@ import { socket } from "../../../socket";
 import "../ProjectWorkspace.css";
 import "./SubmissionHistory.css";
 import React from "react";
+import { apiRequest } from "../../../api";
 /* ─── icons ────────────────────────────────────── */
 function IEdit() {
   return (
@@ -278,30 +279,17 @@ export default React.memo(function SubmissionHistory({ projectId, token }) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(
-        `http://localhost:5000/projects/${projectId}/submissions`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        },
-      );
+      const res = await apiRequest(`/projects/${projectId}/submissions`);
       if (!res.ok) {
         setError("Failed to load submission history");
         return;
       }
       const data = await res.json();
       const sorted = Array.isArray(data)
-        ? [...data].sort(
-            (a, b) => new Date(b.submitted_at) - new Date(a.submitted_at),
-          )
+        ? [...data].sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))
         : [];
-
       setHistory(sorted);
-      console.log("HISTORY DATA:", data);
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError("Failed to load submission history");
     } finally {
       setLoading(false);
@@ -310,29 +298,25 @@ export default React.memo(function SubmissionHistory({ projectId, token }) {
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this version?")) return;
-    await fetch(
-      `http://localhost:5000/projects/${projectId}/submissions/${id}`,
-      { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+    await apiRequest(
+      `/projects/${projectId}/submissions/${id}`,
+      { method: "DELETE" },
     );
-    fetchHistory(); // refresh after delete
+    fetchHistory();
   };
 
   const handleUpdate = async (id) => {
     if (!editData.notes || editData.notes.trim() === "") return;
-    await fetch(
-      `http://localhost:5000/projects/${projectId}/submissions/${id}`,
+    await apiRequest(
+      `/projects/${projectId}/submissions/${id}`,
       {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(editData),
       },
     );
     setEditingId(null);
     setEditData({});
-    fetchHistory(); // refresh after update
+    fetchHistory();
   };
 
   const handleEditStart = (item) => {
@@ -350,23 +334,15 @@ export default React.memo(function SubmissionHistory({ projectId, token }) {
       alert("Please write an update");
       return;
     }
-
     try {
       setSubmitting(true);
-
-      await fetch(`http://localhost:5000/projects/${projectId}/submissions`, {
+      await apiRequest(`/projects/${projectId}/submissions`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ notes: newNote }),
       });
-
       setNewNote("");
-      fetchHistory(); // instant refresh
-    } catch (err) {
-      console.error(err);
+      fetchHistory();
+    } catch {
       alert("Failed to add update");
     } finally {
       setSubmitting(false);
@@ -380,17 +356,11 @@ export default React.memo(function SubmissionHistory({ projectId, token }) {
 
   useEffect(() => {
     if (!projectId) return;
-    const handleHistoryUpdated = () => {
-      console.log("SOCKET TRIGGER");
-      fetchHistory();
-    };
+    const handleHistoryUpdated = () => fetchHistory();
     socket.off("submission_history_updated");
     socket.on("submission_history_updated", handleHistoryUpdated);
-
     return () => socket.off("submission_history_updated", handleHistoryUpdated);
   }, [projectId, token]);
-
-  console.log("SUBMISSION HISTORY RENDER");
 
   return (
     <div className="sh-root dd-card" style={{ "--ci": 6 }}>

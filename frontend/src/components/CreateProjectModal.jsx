@@ -1,5 +1,6 @@
 import "./CreateProjectModal.css";
 import { useState, useEffect, useRef } from "react";
+import { apiRequest } from "../api";
 /* ── Floating label field ─────────────────────────────────────── */
 function Field({ label, id, children, error, className = "" }) {
   return (
@@ -147,14 +148,8 @@ const CreateProjectModal = ({ onClose, onCreate, project, bids: propBids = [] })
 
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-
-      const res = await fetch("http://localhost:5000/api/projects", {
+      const res = await apiRequest("/api/projects", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           title,
           description,
@@ -205,25 +200,14 @@ const CreateProjectModal = ({ onClose, onCreate, project, bids: propBids = [] })
     if (!project?.id) return;
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(
-        `http://localhost:5000/api/projects/${project.id}/bids`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await apiRequest(`/api/projects/${project.id}/bids`);
       const data = await res.json();
-      setBids(data);
-
-      // Highlight accepted
-      const accepted = data.find((b) => b.status === "accepted");
-      if (accepted) {
-        setAcceptedBidId(accepted.id);
-      }
-    } catch (err) {
-      // Ignore for now
+      const rows = Array.isArray(data) ? data : (data.data ?? []);
+      setBids(rows);
+      const accepted = rows.find((b) => b.status === "accepted");
+      if (accepted) setAcceptedBidId(accepted.id);
+    } catch {
+      // ignore
     } finally {
       setLoading(false);
     }
@@ -241,20 +225,14 @@ const CreateProjectModal = ({ onClose, onCreate, project, bids: propBids = [] })
   const acceptBid = async (bidId) => {
     try {
       setAssigning(true);
-      const token = localStorage.getItem("token");
-      await fetch(
-        `http://localhost:5000/api/projects/${project.id}/accept-bid/${bidId}`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+      await apiRequest(
+        `/api/projects/${project.id}/accept-bid/${bidId}`,
+        { method: "POST" }
       );
       setAcceptedBidId(bidId);
       fetchBids();
-    } catch (err) {
-      console.error(err);
+    } catch {
+      // ignore
     } finally {
       setAssigning(false);
     }
