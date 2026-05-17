@@ -78,6 +78,7 @@ export default function ProjectFeed({
   setSelectedProject,
   allTags,
   setFilteredCount,
+  onBidPlaced,
 }) {
   const filtered = projects.filter((p) => {
     if (p.status !== "open" && p.status !== "bidding") return false;
@@ -172,7 +173,11 @@ export default function ProjectFeed({
       )}
 
       {selectedProject && (
-        <BidModal project={selectedProject} onClose={() => setSelectedProject(null)} />
+        <BidModal
+          project={selectedProject}
+          onClose={() => setSelectedProject(null)}
+          onBidPlaced={onBidPlaced}
+        />
       )}
     </div>
   );

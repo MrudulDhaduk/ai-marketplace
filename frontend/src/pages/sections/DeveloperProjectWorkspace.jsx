@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { socket } from "../../socket";
 import SubmissionHistory from "./components/SubmissionHistory";
 import React from "react";
-import { apiRequest, API_BASE_URL } from "../../api";
+import { apiRequest, API_BASE_URL } from "../../lib/api";
 
 /* ── helpers ─────────────────────────────────────────── */
 const timeAgo = (dateStr) => {
@@ -253,7 +253,6 @@ function DeveloperProjectWorkspace({ project, onBack }) {
       pushNotif("🚀 Work submitted for review!", "success");
       setTimeout(() => setSubmissionState("idle"), 3000);
     } catch (err) {
-      console.error(err);
       setSubmissionState("idle");
       setSubmissionError("Submission failed. Please try again.");
     }
@@ -637,7 +636,7 @@ function DeveloperProjectWorkspace({ project, onBack }) {
                         <span className="dd-file-type-icon">{getFileIcon(file.file_name)}</span>
                         <div className="dd-file-info">
                           <a
-                            href={`http://localhost:5000/uploads/${file.file_name}`}
+                            href={`${API_BASE_URL}/uploads/${file.file_name}`}
                             target="_blank"
                             rel="noreferrer"
                             className="dd-file-link"

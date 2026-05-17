@@ -23,14 +23,27 @@ async function getProfile(req, res) {
 
     const user = userResult.rows[0];
 
-    const statsResult = await pool.query(
-      `SELECT
-         COUNT(*) FILTER (WHERE status = 'completed') AS "projectsCompleted",
-         COUNT(*) FILTER (WHERE status = 'active')    AS "activeProjects"
-       FROM projects
-       WHERE client_id = $1`,
-      [id],
-    );
+    // Stats differ by role: clients track projects they own, developers track assigned projects
+    let statsResult;
+    if (user.role === "developer") {
+      statsResult = await pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE status = 'completed') AS "projectsCompleted",
+           COUNT(*) FILTER (WHERE status = 'active')    AS "activeProjects"
+         FROM projects
+         WHERE assigned_developer_id = $1`,
+        [id],
+      );
+    } else {
+      statsResult = await pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE status = 'completed') AS "projectsCompleted",
+           COUNT(*) FILTER (WHERE status = 'active')    AS "activeProjects"
+         FROM projects
+         WHERE client_id = $1`,
+        [id],
+      );
+    }
 
     const signals = isSelf
       ? { emailVerified: user.email_verified, phoneVerified: user.phone_verified }
@@ -40,6 +53,39 @@ async function getProfile(req, res) {
   } catch (err) {
     logger.error("getProfile error", err);
     res.status(500).json({ message: "Error fetching profile" });
+  }
+}
+
+/** PUT /profile/:id — update bio */
+async function updateProfile(req, res) {
+  try {
+    const { id } = req.params;
+
+    if (Number(req.user.id) !== Number(id)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const { bio } = req.body;
+
+    if (bio !== undefined && typeof bio !== "string") {
+      return res.status(400).json({ message: "Bio must be a string" });
+    }
+
+    const trimmedBio = typeof bio === "string" ? bio.trim().slice(0, 1000) : null;
+
+    const result = await pool.query(
+      "UPDATE users SET bio = $1 WHERE id = $2 RETURNING id, username, role, bio",
+      [trimmedBio, id],
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "Profile updated", user: result.rows[0] });
+  } catch (err) {
+    logger.error("updateProfile error", err);
+    res.status(500).json({ message: "Error updating profile" });
   }
 }
 
@@ -127,4 +173,4 @@ async function removeSkill(req, res) {
   }
 }
 
-module.exports = { getProfile, getSkills, addSkill, removeSkill };
+module.exports = { getProfile, updateProfile, getSkills, addSkill, removeSkill };

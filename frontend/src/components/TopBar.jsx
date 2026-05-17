@@ -2,6 +2,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./TopBar.css";
 import { socket } from "../socket";
+import { useAuth } from "../context/AuthContext";
+import { apiRequest } from "../lib/api";
+
 /* ═══════════════════════════════════════
    ICONS
 ═══════════════════════════════════════ */
@@ -9,29 +12,15 @@ function ISearch() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
       <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M16.5 16.5L21 21"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
+      <path d="M16.5 16.5L21 21" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
 function IBell() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
-      <path
-        d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M13.73 21a2 2 0 0 1-3.46 0"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -39,12 +28,7 @@ function IUser() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M4 20c0-4 3.582-7 8-7s8 3 8 7"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+      <path d="M4 20c0-4 3.582-7 8-7s8 3 8 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -52,52 +36,23 @@ function ISettings() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   );
 }
 function ILogout() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
-      <path
-        d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-      <polyline
-        points="16 17 21 12 16 7"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <line
-        x1="21"
-        y1="12"
-        x2="9"
-        y2="12"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <polyline points="16 17 21 12 16 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
 function IChevron() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
-      <path
-        d="M6 9l6 6 6-6"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -114,6 +69,7 @@ export default function TopBar({
   showSearch = true,
 }) {
   const navigate = useNavigate();
+  const { currentUser: user, logout } = useAuth();
   const [dropOpen, setDropOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -122,17 +78,78 @@ export default function TopBar({
   const notifRef = useRef(null);
   const searchRef = useRef(null);
 
-  const user = (() => {
-    try {
-      return JSON.parse(localStorage.getItem("user"));
-    } catch {
-      return null;
-    }
-  })();
-
   const initial = user?.username?.[0]?.toUpperCase() || "U";
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  /* Close dropdowns on outside click */
+  /* ── Load persisted notifications on mount ── */
+  const fetchNotifications = useCallback(() => {
+    if (!user?.id) return;
+    apiRequest("/notifications?limit=20")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.data) setNotifications(data.data);
+      })
+      .catch(() => {});
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  /* ── Register socket room ── */
+  // Emit "register" both immediately (if already connected) and on every
+  // (re)connect so the personal room is always joined even after a
+  // reconnect or a page-refresh where the socket connects slightly after
+  // this effect runs.
+  // Also re-fetch notifications on reconnect to recover any events that
+  // were emitted while the socket was disconnected.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const onConnect = () => {
+      socket.emit("register", user.id);
+      // Re-fetch to pick up any notifications persisted while disconnected
+      fetchNotifications();
+    };
+
+    // If already connected, register right away
+    if (socket.connected) {
+      socket.emit("register", user.id);
+    }
+
+    socket.on("connect", onConnect);
+    return () => {
+      socket.off("connect", onConnect);
+    };
+  }, [user?.id, fetchNotifications]);
+
+  /* ── Real-time notification listener ── */
+  useEffect(() => {
+    if (!user) return;
+
+    // Single handler for all persisted notifications from the server.
+    // The backend always emits "notification" with the real DB row (including
+    // a valid integer id), so we never need fake ids here.
+    // The legacy role-specific "new_bid" / "bid_accepted" socket events are
+    // intentionally NOT listened to here — they would create duplicate
+    // notifications with fake Date.now() ids that cause 404s when the user
+    // tries to mark them as read.
+    const handleNotification = (notif) => {
+      setNotifications((prev) => {
+        // Deduplicate: ignore if we already have this notification id
+        if (prev.some((n) => n.id === notif.id)) return prev;
+        return [notif, ...prev];
+      });
+    };
+
+    socket.on("notification", handleNotification);
+
+    return () => {
+      socket.off("notification", handleNotification);
+    };
+  }, [user]);
+
+  /* ── Close dropdowns on outside click ── */
   useEffect(() => {
     if (!dropOpen && !notifOpen) return;
     const handler = (e) => {
@@ -143,60 +160,40 @@ export default function TopBar({
     return () => document.removeEventListener("mousedown", handler);
   }, [dropOpen, notifOpen]);
 
-  /* Keyboard: close dropdowns on Escape */
+  /* ── Keyboard: close on Escape ── */
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === "Escape") {
-        setDropOpen(false);
-        setNotifOpen(false);
-      }
+      if (e.key === "Escape") { setDropOpen(false); setNotifOpen(false); }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
-  /* Register user for role-based rooms */
-  useEffect(() => {
-    if (user?.id) {
-      socket.emit("register", user.id);
-    }
-  }, [user]);
+  /* ── Mark single notification as read ── */
+  const handleMarkRead = useCallback(async (notif) => {
+    if (notif.is_read) return;
+    setNotifications((prev) =>
+      prev.map((n) => n.id === notif.id ? { ...n, is_read: true } : n),
+    );
+    try {
+      await apiRequest(`/notifications/${notif.id}/read`, { method: "PUT" });
+    } catch {}
+  }, []);
 
-  /* Role-based listeners */
-  useEffect(() => {
-    if (!user) return;
-
-    if (user.role === "client") {
-      socket.on("new_bid", (data) => {
-        setNotifications((prev) => [data, ...prev]);
-      });
-    }
-
-    if (user.role === "developer") {
-      socket.on("bid_accepted", (data) => {
-        setNotifications((prev) => [data, ...prev]);
-      });
-    }
-
-    return () => {
-      socket.off("new_bid");
-      socket.off("bid_accepted");
-    };
-  }, [user]);
+  /* ── Mark all as read ── */
+  const handleMarkAllRead = useCallback(async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    try {
+      await apiRequest("/notifications/read-all", { method: "PUT" });
+    } catch {}
+  }, []);
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
+    logout();
     navigate("/login");
-  }, [navigate]);
+  }, [logout, navigate]);
 
   const showCount = total !== null && filtered !== null;
-
-  const countLabel = showCount
-    ? filtered < total
-      ? `${filtered} of ${total} projects`
-      : `${total} projects`
-    : null;
 
   return (
     <header className="topbar">
@@ -215,12 +212,8 @@ export default function TopBar({
       <div className="topbar-right">
         {/* Search */}
         {showSearch && (
-          <div
-            className={`topbar-search${searchFocused ? " topbar-search--focus" : ""}`}
-          >
-            <span className="topbar-search-icon">
-              <ISearch />
-            </span>
+          <div className={`topbar-search${searchFocused ? " topbar-search--focus" : ""}`}>
+            <span className="topbar-search-icon"><ISearch /></span>
             <input
               ref={searchRef}
               className="topbar-search-input"
@@ -235,10 +228,7 @@ export default function TopBar({
             {search && (
               <button
                 className="topbar-search-clear"
-                onClick={() => {
-                  onSearch("");
-                  searchRef.current?.focus();
-                }}
+                onClick={() => { onSearch(""); searchRef.current?.focus(); }}
                 aria-label="Clear search"
               >
                 ×
@@ -252,28 +242,49 @@ export default function TopBar({
           <button
             className="topbar-icon-btn"
             title="Notifications"
-            aria-label="Notifications"
+            aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
             onClick={() => setNotifOpen((v) => !v)}
           >
             <IBell />
-            <span className="topbar-notif-dot" aria-hidden="true" />
-            {notifications.length > 0 && (
-              <span className="topbar-notif-count">
-                {notifications.length}
+            {unreadCount > 0 && (
+              <span className="topbar-notif-count" aria-hidden="true">
+                {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
           </button>
 
           {notifOpen && (
             <div className="notif-dropdown">
+              <div className="notif-header">
+                <span className="notif-header-title">Notifications</span>
+                {unreadCount > 0 && (
+                  <button className="notif-mark-all" onClick={handleMarkAllRead}>
+                    Mark all read
+                  </button>
+                )}
+              </div>
               {notifications.length === 0 ? (
-                <p className="notif-empty">No notifications</p>
+                <p className="notif-empty">No notifications yet</p>
               ) : (
-                notifications.map((n, i) => (
-                  <div key={i} className="notif-item">
-                    {n.message}
-                  </div>
-                ))
+                <ul className="notif-list">
+                  {notifications.slice(0, 20).map((n, i) => (
+                    <li
+                      key={n.id ?? i}
+                      className={`notif-item${n.is_read ? "" : " notif-item--unread"}`}
+                      onClick={() => handleMarkRead(n)}
+                    >
+                      <span className="notif-dot" />
+                      <div className="notif-body">
+                        <p className="notif-msg">{n.message}</p>
+                        {n.created_at && (
+                          <span className="notif-time">
+                            {timeAgo(n.created_at)}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
           )}
@@ -290,33 +301,21 @@ export default function TopBar({
           >
             <span className="topbar-avatar">{initial}</span>
             <div className="topbar-user-info">
-              <span className="topbar-username">
-                {user?.username || "User"}
-              </span>
+              <span className="topbar-username">{user?.username || "User"}</span>
               <span className="topbar-role">{user?.role || "Member"}</span>
             </div>
-            <span
-              className={`topbar-chevron${dropOpen ? " topbar-chevron--open" : ""}`}
-            >
+            <span className={`topbar-chevron${dropOpen ? " topbar-chevron--open" : ""}`}>
               <IChevron />
             </span>
           </button>
 
-          {/* Dropdown */}
           {dropOpen && (
-            <div
-              className="topbar-dropdown"
-              role="menu"
-              aria-label="Profile menu"
-            >
-              {/* User card inside dropdown */}
+            <div className="topbar-dropdown" role="menu" aria-label="Profile menu">
               <div className="topbar-drop-user">
                 <span className="topbar-drop-avatar">{initial}</span>
                 <div>
                   <p className="topbar-drop-name">{user?.username || "User"}</p>
-                  <p className="topbar-drop-email">
-                    {user?.email || user?.role || "Member"}
-                  </p>
+                  <p className="topbar-drop-email">{user?.email || user?.role || "Member"}</p>
                 </div>
               </div>
 
@@ -325,28 +324,18 @@ export default function TopBar({
               <button
                 className="topbar-drop-item"
                 role="menuitem"
-                onClick={() => {
-                  setDropOpen(false);
-                  navigate("/profile");
-                }}
+                onClick={() => { setDropOpen(false); navigate("/profile"); }}
               >
-                <span className="topbar-drop-icon">
-                  <IUser />
-                </span>
+                <span className="topbar-drop-icon"><IUser /></span>
                 Profile
               </button>
 
               <button
                 className="topbar-drop-item"
                 role="menuitem"
-                onClick={() => {
-                  setDropOpen(false);
-                  navigate("/settings");
-                }}
+                onClick={() => { setDropOpen(false); navigate("/settings"); }}
               >
-                <span className="topbar-drop-icon">
-                  <ISettings />
-                </span>
+                <span className="topbar-drop-icon"><ISettings /></span>
                 Settings
               </button>
 
@@ -357,9 +346,7 @@ export default function TopBar({
                 role="menuitem"
                 onClick={handleLogout}
               >
-                <span className="topbar-drop-icon">
-                  <ILogout />
-                </span>
+                <span className="topbar-drop-icon"><ILogout /></span>
                 Log out
               </button>
             </div>
@@ -368,4 +355,16 @@ export default function TopBar({
       </div>
     </header>
   );
+}
+
+/* ── helpers ── */
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }

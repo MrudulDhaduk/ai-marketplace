@@ -1,34 +1,21 @@
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import ClientDashboard from "./ClientDashboard";
 import DeveloperDashboard from "./DeveloperDashboard";
-import { Navigate } from "react-router-dom";
 
 const Dashboard = () => {
-  const userData = localStorage.getItem("user");
+  const { currentUser, isAuthenticated } = useAuth();
 
-  if (!userData || userData === "undefined") {
-    return <Navigate to="/login" />;
+  if (!isAuthenticated || !currentUser) {
+    return <Navigate to="/login" replace />;
   }
 
-  let user;
+  const role = currentUser.role?.toLowerCase();
 
-  try {
-    const parsed = JSON.parse(userData);
-    user = parsed.user || parsed; // ✅ FIX
-  } catch (err) {
-    return <Navigate to="/login" />;
-  }
+  if (role === "client") return <ClientDashboard />;
+  if (role === "developer") return <DeveloperDashboard />;
 
-  const role = user.role?.toLowerCase();
-
-  if (role === "client") {
-    return <ClientDashboard user={user} />;
-  }
-
-  if (role === "developer") {
-    return <DeveloperDashboard user={user} />;
-  }
-
-  return <Navigate to="/login" />;
+  return <Navigate to="/login" replace />;
 };
 
 export default Dashboard;

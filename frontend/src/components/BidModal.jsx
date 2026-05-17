@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import "./BidModal.css";
-import { apiRequest } from "../api";
+import { apiRequest } from "../lib/api";
 
 /* ─── icons ─────────────────────────────────────── */
 function IClose() {
@@ -104,7 +104,7 @@ function fmt(n) {
   return Number(n).toLocaleString("en-IN");
 }
 
-export default function BidModal({ project, onClose }) {
+export default function BidModal({ project, onClose, onBidPlaced }) {
   const [amount, setAmount] = useState("");
   const [proposal, setProposal] = useState("");
   const [loading, setLoading] = useState(false);
@@ -181,6 +181,17 @@ export default function BidModal({ project, onClose }) {
         }
       } else {
         setSuccess(true);
+        // Notify parent immediately so "My Bids" updates without a refresh
+        if (onBidPlaced) {
+          onBidPlaced({
+            ...data.bid,
+            title: project.title,
+            project_id: project.id,
+            project_status: project.status,
+            min_budget: project.min_budget,
+            max_budget: project.max_budget,
+          });
+        }
         setTimeout(onClose, 1800);
       }
     } catch {

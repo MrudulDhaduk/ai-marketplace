@@ -1,6 +1,6 @@
 import "./CreateProjectModal.css";
 import { useState, useEffect, useRef } from "react";
-import { apiRequest } from "../api";
+import { apiRequest } from "../lib/api";
 /* ── Floating label field ─────────────────────────────────────── */
 function Field({ label, id, children, error, className = "" }) {
   return (
@@ -166,7 +166,6 @@ const CreateProjectModal = ({ onClose, onCreate, project, bids: propBids = [] })
       }
 
       const data = await res.json();
-      console.log("Created:", data);
       const formatted = {
         ...data,
         budget: `₹${data.min_budget ?? 0} - ₹${data.max_budget ?? 0}`,

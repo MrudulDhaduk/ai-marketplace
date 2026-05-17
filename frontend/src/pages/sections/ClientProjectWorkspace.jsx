@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import "./ProjectWorkspace.css";
 import { socket } from "../../socket";
 import SubmissionHistory from "./components/SubmissionHistory";
-import { apiRequest } from "../../api";
+import { apiRequest, API_BASE_URL } from "../../lib/api";
 
 /* ─── constants ─────────────────────────────────────────── */
 const STATUS_META = {
@@ -143,7 +143,7 @@ function SectionTitle({ icon, title, badge, badgeColor }) {
 /* ══════════════════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
-export default function ClientProjectWorkspace({ project, onBack }) {
+export default function ClientProjectWorkspace({ project, onBack, onNavigateToMessages }) {
   /* ── existing state (untouched) ─────────────────────────── */
   const [files,               setFiles]               = useState([]);
   const [deliverables,        setDeliverables]        = useState({ repoLink: "", demoLink: "", notes: "" });
@@ -275,17 +275,14 @@ export default function ClientProjectWorkspace({ project, onBack }) {
       setSubmittedAt(updated?.submitted_at ?? null);
     };
 
-    /* new socket: developer online/offline */
-    const handleDevStatus = ({ status }) => setDeveloperStatus(status ?? "offline");
+    /* developer_status socket event removed — not emitted by server */
 
     socket.on("project_submitted", handleProjectSubmitted);
     socket.on("project_reviewed",  handleProjectReviewed);
-    socket.on("developer_status",  handleDevStatus);
 
     return () => {
       socket.off("project_submitted", handleProjectSubmitted);
       socket.off("project_reviewed",  handleProjectReviewed);
-      socket.off("developer_status",  handleDevStatus);
     };
   }, [project?.id, token]);
 
@@ -316,24 +313,58 @@ export default function ClientProjectWorkspace({ project, onBack }) {
     }
   };
 
-  /* ── new quick-action handlers ──────────────────────────── */
+  /* ── quick-action handlers ──────────────────────────── */
   const handleQuickAction = async (actionKey) => {
     setActionLoading(actionKey);
     try {
       if (actionKey === "message") {
-        // placeholder — wire to your messaging system
-        flashAction("💬 Opening message thread…");
+        // Navigate to messages section and open this project's conversation
+        if (onNavigateToMessages) {
+          onNavigateToMessages(project.id);
+        } else {
+          flashAction("💬 Go to the Messages section to chat with your developer.");
+        }
       }
+
       if (actionKey === "request_update") {
-        await apiRequest(`/projects/${project.id}/request-update`, { method: "POST", body: JSON.stringify({ action: "revision", feedback: "Update requested by client" }) }).catch(() => {}); // graceful if endpoint not yet live
-        flashAction("📣 Update requested — developer has been notified.");
+        const res = await apiRequest(`/projects/${project.id}/request-update`, {
+          method: "POST",
+          body: JSON.stringify({ action: "revision", feedback: "Client requested a status update." }),
+        });
+        if (res.ok) {
+          flashAction("📣 Update requested — developer has been notified.");
+        } else {
+          flashAction("Failed to send update request.");
+        }
       }
+
       if (actionKey === "urgent") {
-        setIsUrgent(u => !u);
-        flashAction(isUrgent ? "🔕 Urgency flag removed." : "🚨 Marked as urgent — developer notified.");
+        const next = !isUrgent;
+        setIsUrgent(next);
+        // Notify developer via the request-update mechanism
+        if (next) {
+          await apiRequest(`/projects/${project.id}/request-update`, {
+            method: "POST",
+            body: JSON.stringify({ action: "revision", feedback: "🚨 This project has been marked as URGENT by the client. Please prioritise." }),
+          }).catch(() => {});
+          flashAction("🚨 Marked as urgent — developer notified.");
+        } else {
+          flashAction("🔕 Urgency flag removed.");
+        }
       }
+
       if (actionKey === "reopen") {
-        flashAction("🔄 Reopen request sent.");
+        // Reset review status back to pending so developer can resubmit
+        const res = await apiRequest(`/projects/${project.id}/review`, {
+          method: "PUT",
+          body: JSON.stringify({ action: "revision", feedback: "Client has requested additional work. Please resubmit when ready." }),
+        });
+        if (res.ok) {
+          setReviewStatus("revision_requested");
+          flashAction("🔄 Project reopened — developer has been notified.");
+        } else {
+          flashAction("Failed to reopen project.");
+        }
       }
     } finally {
       setActionLoading(null);
@@ -620,7 +651,7 @@ export default function ClientProjectWorkspace({ project, onBack }) {
                       <span className="cpw-file-type-icon">{icon}</span>
                       <div className="cpw-file-info">
                         <a
-                          href={`http://localhost:5000/uploads/${file.file_name}`}
+                          href={`${API_BASE_URL}/uploads/${file.file_name}`}
                           target="_blank"
                           rel="noreferrer"
                           className="dd-file-link"
@@ -634,7 +665,7 @@ export default function ClientProjectWorkspace({ project, onBack }) {
                       </div>
                       <a
                         className="dd-bid-btn cpw-dl-btn"
-                        href={`http://localhost:5000/uploads/${file.file_name}`}
+                        href={`${API_BASE_URL}/uploads/${file.file_name}`}
                         download
                         title="Download"
                       >

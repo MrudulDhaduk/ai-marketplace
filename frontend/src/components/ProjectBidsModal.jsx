@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import "./ProjectBidsModal.css";
-import { apiRequest } from "../api";
+import { apiRequest } from "../lib/api";
 
 export default function ProjectBidsModal({ project, onClose }) {
   const [bids, setBids] = useState([]);

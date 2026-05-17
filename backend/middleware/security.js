@@ -1,7 +1,6 @@
 const helmet = require("helmet");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
-const mongoSanitize = require("express-mongo-sanitize");
 const hpp = require("hpp");
 const config = require("../config/env");
 
@@ -21,7 +20,6 @@ function applySecurity(app) {
   app.disable("x-powered-by");
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(cors(corsOptions));
-  app.use(mongoSanitize());
   app.use(hpp());
   app.use(apiLimiter);
 }

@@ -2,7 +2,8 @@ import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import '../auth.css';
 import { useNavigate } from "react-router-dom";
-import { apiRequest } from '../api';
+import { apiRequest } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 /* ─────────────────────────────────────────
    Reusable AuthInput (mirrors Signup page)
 ───────────────────────────────────────── */
@@ -91,7 +92,8 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [shake, setShake]     = useState(false);
   const formRef               = useRef(null);
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
+  const { login } = useAuth();
   const fields = [
     { name: 'username', label: 'Username', type: 'text',     placeholder: 'ada_lovelace' },
     { name: 'password', label: 'Password', type: 'password', placeholder: '••••••••••••' },
@@ -142,11 +144,8 @@ function Login() {
         });
         triggerShake();
       } else {
-        /* Success */
-        console.log('Login successful:', data);
-        // TODO: redirect / store token here
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
+        /* Success — store via AuthContext (handles localStorage internally) */
+        login({ token: data.token, user: data.user });
         navigate("/dashboard");
       }
     } catch {

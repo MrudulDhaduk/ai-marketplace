@@ -7,7 +7,9 @@
     "start": "node backend/server.js",
     "dev": "nodemon backend/server.js",
     "check": "node --check backend/server.js && node --check backend/routes/index.js && node --check backend/sockets/index.js",
-    "migrate:sql": "psql \"$DATABASE_URL\" -f backend/db/migrations/001_security_indexes.sql"
+    "migrate": "node backend/db/migrate.js",
+    "migrate:psql": "psql \"$DATABASE_URL\" -f backend/db/migrations/001_security_indexes.sql -f backend/db/migrations/002_notifications.sql -f backend/db/migrations/003_messages.sql -f backend/db/migrations/004_project_events.sql -f backend/db/migrations/005_required_additions.sql",
+    "migrate:005": "psql \"$DATABASE_URL\" -f backend/db/migrations/005_required_additions.sql"
   },
   "keywords": [],
   "author": "",
@@ -20,7 +22,6 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^8.5.1",
     "helmet": "^8.1.0",
     "hpp": "^0.2.3",

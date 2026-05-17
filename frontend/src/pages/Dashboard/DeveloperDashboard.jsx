@@ -7,92 +7,19 @@ import ProjectFeed from "../sections/ProjectFeed";
 import ActiveBids from "../sections/ActiveBids";
 import MyProjects from "../sections/MyProjects";
 import ProjectWorkspace from "../sections/DeveloperProjectWorkspace";
+import DeveloperMessages from "../sections/DeveloperMessages";
+import DeveloperRatings from "../sections/DeveloperRatings";
+import DeveloperSettings from "../sections/DeveloperSettings";
 import { useMousePos, useRipple } from "../hooks";
 import React from "react";
-import { apiRequest } from "../../api";
-
-
-const DUMMY_PROJECTS = [
-  {
-    id: 1,
-    title: "AI-Powered Resume Screener",
-    description:
-      "Build an NLP pipeline that scores resumes against job descriptions using semantic similarity. Must integrate with our existing HR system via REST API.",
-    min_budget: 25000,
-    max_budget: 45000,
-    due_date: "2025-05-18",
-    status: "open",
-    tags: ["Python", "NLP", "FastAPI", "OpenAI"],
-  },
-  {
-    id: 2,
-    title: "Real-time Fraud Detection Dashboard",
-    description:
-      "Design and implement a streaming analytics dashboard that visualises transaction anomaly scores. WebSocket updates required.",
-    min_budget: 40000,
-    max_budget: 70000,
-    due_date: "2025-06-02",
-    status: "open",
-    tags: ["React", "WebSocket", "Kafka", "Python"],
-  },
-  {
-    id: 3,
-    title: "LLM-based Legal Document Summariser",
-    description:
-      "Integrate Claude / GPT-4 to auto-summarise long legal documents with key clause extraction. Accuracy benchmarks required.",
-    min_budget: 15000,
-    max_budget: 30000,
-    due_date: "2025-05-28",
-    status: "open",
-    tags: ["LangChain", "Claude", "Next.js", "Postgres"],
-  },
-  {
-    id: 4,
-    title: "Computer Vision for Retail Shelf Monitoring",
-    description:
-      "Train a YOLO v8 model to detect out-of-stock items from CCTV feeds. Cloud deployment on GCP with real-time alerting.",
-    min_budget: 55000,
-    max_budget: 90000,
-    due_date: "2025-06-15",
-    status: "open",
-    tags: ["PyTorch", "YOLO", "GCP", "OpenCV"],
-  },
-  {
-    id: 5,
-    title: "Voice-to-CRM Data Entry Bot",
-    description:
-      "Whisper-based transcription tool that parses sales calls and auto-fills CRM fields. Salesforce integration required.",
-    min_budget: 20000,
-    max_budget: 38000,
-    due_date: "2025-05-22",
-    status: "bidding",
-    tags: ["Whisper", "Salesforce", "Node.js", "AWS"],
-  },
-  {
-    id: 6,
-    title: "Personalised Learning Path Generator",
-    description:
-      "Build a recommendation engine that creates adaptive learning paths from user quiz performance. EdTech SaaS context.",
-    min_budget: 18000,
-    max_budget: 32000,
-    due_date: "2025-06-08",
-    status: "open",
-    tags: ["Python", "Recommendation", "React", "Supabase"],
-  },
-];
-
-const ALL_TAGS = [...new Set(DUMMY_PROJECTS.flatMap((p) => p.tags))].sort();
+import { apiRequest } from "../../lib/api";
+import { useAuth } from "../../context/AuthContext";
 
 
 const MemoBackground = React.memo(Background);
+
 export default function DeveloperDashboard() {
-  const user = (() => {
-    try {
-      return JSON.parse(localStorage.getItem("user"));
-    } catch {
-      return null;
-    }
-  })();
+  const { currentUser: user } = useAuth();
 
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -107,11 +34,13 @@ export default function DeveloperDashboard() {
   const [assignedProjects, setAssignedProjects] = useState([]);
   const [myBids, setMyBids] = useState([]);
   const [bidsView, setBidsView] = useState("list");
-  // Tracks the project currently opened in the in-dashboard workspace.
   const [activeProject, setActiveProject] = useState(null);
+  // For "Message Developer" deep-link from workspace
+  const [messageProjectId, setMessageProjectId] = useState(null);
   const mousePos = useMousePos();
   const shellRef = useRef(null);
 
+  const allTags = [...new Set(projects.flatMap((p) => Array.isArray(p.tags) ? p.tags : []))].sort();
 
   useRipple(shellRef);
 
@@ -124,7 +53,6 @@ export default function DeveloperDashboard() {
         const res = await apiRequest(`/projects/discover/${user.id}?all=${showAll}`);
         if (!res.ok) throw new Error("fetch failed");
         const data = await res.json();
-        // Support paginated { data: [] } and legacy flat array
         const rows = Array.isArray(data) ? data : (data.data ?? []);
         setProjects(rows);
       } catch {
@@ -145,7 +73,8 @@ export default function DeveloperDashboard() {
         const res = await apiRequest(`/projects/assigned/${user.id}`);
         if (!res.ok) throw new Error("fetch failed");
         const data = await res.json();
-        setAssignedProjects(Array.isArray(data) ? data : []);
+        const rows = Array.isArray(data) ? data : (data.data ?? []);
+        setAssignedProjects(rows);
       } catch {
         setAssignedProjects([]);
       }
@@ -160,7 +89,6 @@ export default function DeveloperDashboard() {
       try {
         const res = await apiRequest(`/bids/developer/${user.id}`);
         const data = await res.json();
-        // Support paginated { data: [] } and legacy flat array
         const rows = Array.isArray(data) ? data : (data.data ?? []);
         setMyBids(rows);
       } catch {
@@ -169,6 +97,19 @@ export default function DeveloperDashboard() {
     };
     fetchBids();
   }, []);
+
+  // Navigate to messages tab for a specific project (called from workspace)
+  const handleOpenMessages = (projectId) => {
+    setMessageProjectId(projectId || null);
+    setActiveProject(null);
+    setActiveTab("messages");
+  };
+
+  // Called by BidModal on successful bid — immediately prepends the new bid
+  // to myBids so "Active Bids" updates without a manual refresh
+  const handleBidPlaced = (newBid) => {
+    setMyBids((prev) => [newBid, ...prev]);
+  };
 
   return (
     <div className="developer-theme">
@@ -185,7 +126,11 @@ export default function DeveloperDashboard() {
           <DevSidebar
             user={user}
             activeTab={activeTab}
-            setActiveTab={setActiveTab}
+            setActiveTab={(tab) => {
+              // Clear message deep-link when switching tabs manually
+              if (tab !== "messages") setMessageProjectId(null);
+              setActiveTab(tab);
+            }}
           />
 
           <div className="dd-main">
@@ -193,6 +138,7 @@ export default function DeveloperDashboard() {
               <ProjectWorkspace
                 project={activeProject}
                 onBack={() => setActiveProject(null)}
+                onOpenMessages={handleOpenMessages}
                 onComplete={(updatedProject) => {
                   setAssignedProjects((prev) =>
                     prev.map((p) =>
@@ -219,11 +165,11 @@ export default function DeveloperDashboard() {
                     setView={setView}
                     selectedProject={selectedProject}
                     setSelectedProject={setSelectedProject}
-                    allTags={ALL_TAGS}
+                    allTags={allTags}
                     setFilteredCount={setFilteredCount}
+                    onBidPlaced={handleBidPlaced}
                   />
                 )}
-
                 {activeTab === "active" && (
                   <ActiveBids
                     bids={myBids}
@@ -236,6 +182,15 @@ export default function DeveloperDashboard() {
                     assignedProjects={assignedProjects}
                     onOpenProject={setActiveProject}
                   />
+                )}
+                {activeTab === "messages" && (
+                  <DeveloperMessages initialProjectId={messageProjectId} />
+                )}
+                {activeTab === "ratings" && (
+                  <DeveloperRatings />
+                )}
+                {activeTab === "settings" && (
+                  <DeveloperSettings />
                 )}
               </>
             )}

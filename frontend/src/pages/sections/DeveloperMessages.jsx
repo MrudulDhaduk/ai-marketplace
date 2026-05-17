@@ -23,7 +23,7 @@ function ProjectPicker({ projects, selected, onSelect }) {
         <span className="msg-sidebar-title">Projects</span>
       </div>
       {projects.length === 0 && (
-        <p className="msg-sidebar-empty">No active projects with a developer yet.</p>
+        <p className="msg-sidebar-empty">No active projects yet. Get assigned to a project to start messaging.</p>
       )}
       <ul className="msg-project-list">
         {projects.map((p) => (
@@ -51,7 +51,6 @@ function ChatPanel({ project, currentUser }) {
   const bottomRef = useRef(null);
   const typingTimer = useRef(null);
 
-  /* fetch messages */
   const fetchMessages = useCallback(async () => {
     if (!project?.id) return;
     try {
@@ -67,7 +66,6 @@ function ChatPanel({ project, currentUser }) {
     fetchMessages();
   }, [fetchMessages]);
 
-  /* join socket room + listeners */
   useEffect(() => {
     if (!project?.id) return;
     socket.emit("join_project", project.id);
@@ -90,15 +88,14 @@ function ChatPanel({ project, currentUser }) {
     return () => {
       socket.off("new_message", handleNewMessage);
       socket.off("typing", handleTyping);
+      socket.emit("leave_project", project.id);
     };
   }, [project?.id, currentUser?.id]);
 
-  /* scroll to bottom on new messages */
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /* typing indicator emit */
   const handleInputChange = (e) => {
     setBody(e.target.value);
     socket.emit("typing", { projectId: project.id, typing: true });
@@ -133,7 +130,6 @@ function ChatPanel({ project, currentUser }) {
 
   return (
     <div className="msg-chat">
-      {/* header */}
       <div className="msg-chat-head">
         <div>
           <span className="msg-chat-title">{project.title}</span>
@@ -141,10 +137,9 @@ function ChatPanel({ project, currentUser }) {
         </div>
       </div>
 
-      {/* messages */}
       <div className="msg-messages">
         {messages.length === 0 && (
-          <p className="msg-empty">No messages yet. Start the conversation.</p>
+          <p className="msg-empty">No messages yet. Start the conversation with your client.</p>
         )}
         {messages.map((msg) => {
           const isMine = msg.sender_id === currentUser?.id;
@@ -170,7 +165,6 @@ function ChatPanel({ project, currentUser }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* input */}
       <form className="msg-input-row" onSubmit={handleSend}>
         <input
           className="msg-input"
@@ -190,18 +184,18 @@ function ChatPanel({ project, currentUser }) {
 }
 
 /* ── main component ──────────────────────────────── */
-export default function ClientMessages({ initialProjectId }) {
+export default function DeveloperMessages({ initialProjectId }) {
   const { currentUser } = useAuth();
   const [projects, setProjects] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiRequest("/api/projects?limit=50")
+    if (!currentUser?.id) return;
+    apiRequest(`/projects/assigned/${currentUser.id}?limit=50`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        // Only show projects that have an assigned developer (can message)
-        const rows = (data?.data ?? []).filter((p) => p.assigned_developer_id);
+        const rows = data?.data ?? [];
         setProjects(rows);
         // Auto-select initialProjectId if provided, else first project
         if (initialProjectId) {
@@ -213,7 +207,7 @@ export default function ClientMessages({ initialProjectId }) {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [initialProjectId]);
+  }, [currentUser?.id, initialProjectId]);
 
   if (loading) {
     return (
@@ -233,7 +227,13 @@ export default function ClientMessages({ initialProjectId }) {
           <ChatPanel project={selected} currentUser={currentUser} />
         ) : (
           <div className="msg-chat msg-chat--empty">
-            <p className="msg-empty">Select a project to start messaging.</p>
+            <div style={{ textAlign: "center", padding: "3rem" }}>
+              <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>💬</div>
+              <p className="msg-empty">No active projects yet.</p>
+              <p className="msg-empty" style={{ marginTop: "0.5rem", opacity: 0.6 }}>
+                Once you're assigned to a project, you can message your client here.
+              </p>
+            </div>
           </div>
         )}
       </div>

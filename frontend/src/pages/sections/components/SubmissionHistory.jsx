@@ -3,7 +3,7 @@ import { socket } from "../../../socket";
 import "../ProjectWorkspace.css";
 import "./SubmissionHistory.css";
 import React from "react";
-import { apiRequest } from "../../../api";
+import { apiRequest } from "../../../lib/api";
 /* ─── icons ────────────────────────────────────── */
 function IEdit() {
   return (

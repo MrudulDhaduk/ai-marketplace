@@ -64,13 +64,13 @@ function uploadFiles(req, res) {
 
         for (const file of filesFromPayload) {
           const inserted = await pool.query(
-            `INSERT INTO project_files (project_id, file_name, position)
+            `INSERT INTO project_files (project_id, file_name, size, uploaded_at, position)
              VALUES (
-               $1, $2,
+               $1, $2, $3, NOW(),
                (SELECT COALESCE(MAX(position), 0) + 1 FROM project_files WHERE project_id = $1)
              )
              RETURNING *`,
-            [id, file.filename],
+            [id, file.filename, file.size || null],
           );
           insertedRows.push(inserted.rows[0]);
         }

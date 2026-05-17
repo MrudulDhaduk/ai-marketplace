@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import "../auth.css";
 import { useNavigate } from "react-router-dom";
-import { apiRequest } from "../api";
+import { apiRequest } from "../lib/api";
 
 const FIELDS = [
   {
@@ -269,8 +269,8 @@ function Signup() {
     }
     if (!form.password) {
       newErrors.password = "Password is required";
-    } else if (form.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+    } else if (form.password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters";
     } else if (!/(?=.*[A-Z])(?=.*[0-9])/.test(form.password)) {
       newErrors.password = "Password must contain uppercase and number";
     }
@@ -311,12 +311,10 @@ function Signup() {
         return;
       }
       const data = await res.json();
-
-      console.log(data);
       // redirect
       navigate("/login");
     } catch (err) {
-      console.error(err);
+      setErrors({ general: "Something went wrong. Please try again." });
     }
   };
 

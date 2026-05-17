@@ -1,6 +1,7 @@
 const pool = require("../config/db");
 const logger = require("../utils/logger");
 const { validateSubmission, isNonEmptyString } = require("../utils/validation");
+const { createNotification } = require("../services/notificationService");
 
 /** POST /projects/:id/submit */
 async function submitProject(req, res) {
@@ -47,6 +48,28 @@ async function submitProject(req, res) {
       message: "Project deliverables submitted for review",
     });
     req.io.to(`project_${id}`).emit("submission_history_updated");
+
+    // Notify client
+    const projectInfo = await pool.query(
+      "SELECT client_id, title FROM projects WHERE id = $1",
+      [id],
+    );
+    if (projectInfo.rows[0]?.client_id) {
+      await createNotification({
+        io: req.io,
+        userId: projectInfo.rows[0].client_id,
+        type: "submission_added",
+        message: `New submission on "${projectInfo.rows[0].title}"`,
+        meta: { projectId: Number(id) },
+      });
+    }
+
+    // Record project event
+    await pool.query(
+      `INSERT INTO project_events (project_id, actor_id, event_type, meta)
+       VALUES ($1, $2, 'submission_added', $3)`,
+      [id, req.user.id, JSON.stringify({ repoLink: repoLink.trim() })],
+    ).catch((e) => logger.error("project_events insert error", e));
 
     res.json(result.rows[0]);
   } catch (err) {

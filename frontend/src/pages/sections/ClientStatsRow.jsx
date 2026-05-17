@@ -1,17 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useTilt } from "../hooks";
+import { apiRequest } from "../../lib/api";
 
-const STATS = [
-  { id: "active", label: "Active", value: 4, prefix: "", accent: "orange", Icon: IconFlame },
-  { id: "bids", label: "New Bids", value: 17, prefix: "", accent: "gold", Icon: IconBids },
-  { id: "spent", label: "Deployed", value: 8400, prefix: "$", accent: "lime", Icon: IconDeploy },
-  { id: "done", label: "Completed", value: 12, prefix: "", accent: "teal", Icon: IconShield },
-];
-
+/* ── animated count-up ─────────────────────────── */
 function useCountUp(target, ms = 1300, delay = 0) {
   const [n, setN] = useState(0);
-
   useEffect(() => {
+    setN(0);
     const tid = setTimeout(() => {
       const t0 = performance.now();
       const tick = (now) => {
@@ -21,13 +16,12 @@ function useCountUp(target, ms = 1300, delay = 0) {
       };
       requestAnimationFrame(tick);
     }, delay);
-
     return () => clearTimeout(tid);
   }, [target, ms, delay]);
-
   return n;
 }
 
+/* ── single stat card ──────────────────────────── */
 function StatCard({ stat, idx }) {
   const count = useCountUp(stat.value, 1200, idx * 110);
   const ref = useRef(null);
@@ -46,8 +40,7 @@ function StatCard({ stat, idx }) {
       </div>
       <div className="sc-body">
         <span className="sc-value">
-          {stat.prefix}
-          {count.toLocaleString()}
+          {stat.prefix}{count.toLocaleString()}
         </span>
         <span className="sc-label">{stat.label}</span>
       </div>
@@ -57,79 +50,72 @@ function StatCard({ stat, idx }) {
   );
 }
 
+/* ── stat definitions (values filled from API) ─── */
+const STAT_DEFS = [
+  { id: "activeProjects",   label: "Active",    prefix: "",  accent: "orange", Icon: IconFlame  },
+  { id: "totalBids",        label: "Total Bids", prefix: "", accent: "gold",   Icon: IconBids   },
+  { id: "totalSpend",       label: "Deployed",  prefix: "$", accent: "lime",   Icon: IconDeploy },
+  { id: "completedProjects",label: "Completed", prefix: "",  accent: "teal",   Icon: IconShield },
+];
+
 export default function ClientStatsRow() {
+  const [stats, setStats] = useState({
+    activeProjects: 0,
+    totalBids: 0,
+    totalSpend: 0,
+    completedProjects: 0,
+  });
+
+  useEffect(() => {
+    apiRequest("/api/stats/client")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data) setStats(data); })
+      .catch(() => {});
+  }, []);
+
+  const statCards = STAT_DEFS.map((def) => ({
+    ...def,
+    value: stats[def.id] ?? 0,
+  }));
+
   return (
     <div className="stats-row">
-      {STATS.map((stat, idx) => (
+      {statCards.map((stat, idx) => (
         <StatCard key={stat.id} stat={stat} idx={idx} />
       ))}
     </div>
   );
 }
 
+/* ── icons ─────────────────────────────────────── */
 function IconFlame() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
-      <path
-        d="M12 2c0 5-6 7-6 12a6 6 0 0 0 12 0c0-5-6-7-6-12z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M12 12c0 2-2 3-2 5a2 2 0 0 0 4 0c0-2-2-3-2-5z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
+      <path d="M12 2c0 5-6 7-6 12a6 6 0 0 0 12 0c0-5-6-7-6-12z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M12 12c0 2-2 3-2 5a2 2 0 0 0 4 0c0-2-2-3-2-5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
     </svg>
   );
 }
-
 function IconBids() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
-      <path
-        d="M3 17l4-8 4 5 3-3 4 6"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M3 17l4-8 4 5 3-3 4 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
-
 function IconDeploy() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M12 8v4l3 3"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
+      <path d="M12 8v4l3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
-
 function IconShield() {
   return (
     <svg viewBox="0 0 24 24" fill="none">
-      <path
-        d="M12 3L4 7v5c0 4.4 3.4 8.5 8 9.5 4.6-1 8-5.1 8-9.5V7l-8-4z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M9 12l2 2 4-4"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M12 3L4 7v5c0 4.4 3.4 8.5 8 9.5 4.6-1 8-5.1 8-9.5V7l-8-4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

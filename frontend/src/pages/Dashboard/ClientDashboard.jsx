@@ -11,7 +11,8 @@ import ClientProjectsPanel from "../sections/ClientProjectsPanel";
 import ClientMessages from "../sections/ClientMessages";
 import ClientPayments from "../sections/ClientPayments";
 import ClientProjectWorkspace from "../sections/ClientProjectWorkspace";
-import { apiRequest } from "../../api";
+import { apiRequest } from "../../lib/api";
+import { useAuth } from "../../context/AuthContext";
 
 function formatProjectForCard(p) {
   const hasBudgetText = typeof p.budget === "string" && p.budget.trim();
@@ -46,13 +47,7 @@ function formatProjectForCard(p) {
    ROOT
 ═══════════════════════════════════════════════════ */
 export default function ClientDashboard() {
-  const user = (() => {
-    try {
-      return JSON.parse(localStorage.getItem("user"));
-    } catch {
-      return null;
-    }
-  })();
+  const { currentUser: user } = useAuth();
 
   const [light, setLight] = useState(false);
   const [projects, setProjects] = useState([]);
@@ -64,11 +59,20 @@ export default function ClientDashboard() {
 
   const [selectedProject, setSelectedProject] = useState(null);
   const [activeProject, setActiveProject] = useState(null);
+  // For "Message Developer" deep-link from workspace
+  const [messageProjectId, setMessageProjectId] = useState(null);
 
   useRipple(shellRef, "ripple-wave");
 
   const handleNewProject = (project) => {
     setProjects((prev) => [formatProjectForCard(project), ...prev]);
+  };
+
+  // Called from ClientProjectWorkspace "Message Developer" button
+  const handleNavigateToMessages = (projectId) => {
+    setMessageProjectId(projectId || null);
+    setActiveProject(null);
+    setSection("messages");
   };
 
   useEffect(() => {
@@ -85,7 +89,6 @@ export default function ClientDashboard() {
         }
 
         const data = await response.json();
-        // Support both paginated { data: [] } and legacy flat array responses
         const rows = Array.isArray(data) ? data : (data.data ?? []);
         setProjects(rows.map((project) => formatProjectForCard(project)));
       } catch (error) {
@@ -120,7 +123,11 @@ export default function ClientDashboard() {
           <ClientSidebar
             user={user}
             section={section}
-            onSectionChange={setSection}
+            onSectionChange={(s) => {
+              // Clear message deep-link when switching sections manually
+              if (s !== "messages") setMessageProjectId(null);
+              setSection(s);
+            }}
           />
           <div className="db-main">
             {section === "overview" && (
@@ -145,11 +152,14 @@ export default function ClientDashboard() {
                   <ClientProjectWorkspace
                     project={activeProject}
                     onBack={() => setActiveProject(null)}
+                    onNavigateToMessages={handleNavigateToMessages}
                   />
                 )}
               </>
             )}
-            {section === "messages" && <ClientMessages />}
+            {section === "messages" && (
+              <ClientMessages initialProjectId={messageProjectId} />
+            )}
             {section === "payments" && <ClientPayments />}
           </div>
           {showCreateModal && (
