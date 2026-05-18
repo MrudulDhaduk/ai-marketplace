@@ -4,14 +4,9 @@
    TOKENS — DEEP SPACE TERMINAL
    Palette: midnight navy · electric cyan · soft violet
 ════════════════════════════════════════════════════ */
-.dd-shell,
-.dd-shell * {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
 .dd-shell {
+  box-sizing: border-box;
+
   /* Base surfaces */
   --bg: #080C18;
   --surface: #0D1221;
@@ -42,7 +37,7 @@
   /* Layout */
   --sb-w: 60px;
   --sb-open-w: 212px;
-  --navbar-h: 64px;
+  --navbar-h: 65px;
 
   /* Easing */
   --expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -390,12 +385,8 @@
   flex-direction: column;
   min-height: 100vh;
   transition: margin-left 0.3s var(--expo);
-  isolation: isolate;
 }
 
-.dd-main * {
-  backface-visibility: hidden;
-}
 
 /* ════════════════════════════════════════════════════
    TOPBAR
