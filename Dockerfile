@@ -1,17 +1,17 @@
 # ── Stage 1: Build frontend ───────────────────────────────────────────────────
-FROM node:20-alpine AS frontend-build
+FROM node:20-alpine3.21 AS frontend-build
 
 WORKDIR /app/frontend
 
 # Install deps first (layer cache)
 COPY frontend/package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 COPY frontend/ ./
 RUN npm run build
 
 # ── Stage 2: Production backend ───────────────────────────────────────────────
-FROM node:20-alpine AS production
+FROM node:20-alpine3.21 AS production
 
 # Security: run as non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup

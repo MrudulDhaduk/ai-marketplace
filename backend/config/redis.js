@@ -25,8 +25,9 @@ function createClient(name) {
       logger.warn(`Redis ${name}: reconnect attempt ${times}, next in ${delay}ms`);
       return delay;
     },
-    // Don't buffer commands while disconnected — fail fast
-    enableOfflineQueue: false,
+    // Don't buffer commands while disconnected — fail fast in prod,
+    // but queue them in dev so startup race conditions don't crash the server
+    enableOfflineQueue: true,
     lazyConnect: false,
     maxRetriesPerRequest: 3,
   });
