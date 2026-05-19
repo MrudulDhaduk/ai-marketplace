@@ -75,6 +75,21 @@ export default function ClientDashboard() {
     setSection("messages");
   };
 
+  // ARCH-15 / BUG-M3 fix: when the client approves or requests revision inside
+  // the workspace, propagate the updated project back into the projects array so
+  // the status badge on the Projects panel reflects the change immediately.
+  const handleProjectUpdated = (updatedProject) => {
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === updatedProject.id ? formatProjectForCard(updatedProject) : p,
+      ),
+    );
+    // Also keep activeProject in sync so the workspace header badge is correct
+    setActiveProject((prev) =>
+      prev && prev.id === updatedProject.id ? { ...prev, ...updatedProject } : prev,
+    );
+  };
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -153,6 +168,7 @@ export default function ClientDashboard() {
                     project={activeProject}
                     onBack={() => setActiveProject(null)}
                     onNavigateToMessages={handleNavigateToMessages}
+                    onProjectUpdated={handleProjectUpdated}
                   />
                 )}
               </>

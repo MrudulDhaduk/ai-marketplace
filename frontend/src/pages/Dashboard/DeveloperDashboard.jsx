@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import "./DeveloperDashboard.css";
 import TopBar from "../../components/TopBar";
 import DevSidebar from "../../components/DevSideBar";
@@ -66,21 +66,24 @@ export default function DeveloperDashboard() {
   }, [showAll]);
 
   // assigned projects fetch
-  useEffect(() => {
+  const fetchAssigned = useCallback(async () => {
     if (!user?.id) return;
-    const fetchAssigned = async () => {
-      try {
-        const res = await apiRequest(`/projects/assigned/${user.id}`);
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
-        const rows = Array.isArray(data) ? data : (data.data ?? []);
-        setAssignedProjects(rows);
-      } catch {
-        setAssignedProjects([]);
-      }
-    };
+    try {
+      const res = await apiRequest(`/projects/assigned/${user.id}`);
+      if (!res.ok) throw new Error("fetch failed");
+      const data = await res.json();
+      const rows = Array.isArray(data) ? data : (data.data ?? []);
+      setAssignedProjects(rows);
+    } catch {
+      setAssignedProjects([]);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    // ARCH-16 fix: include user?.id in deps so this runs once the auth context
+    // hydrates (user starts as null on first render for slow context loads).
     fetchAssigned();
-  }, []);
+  }, [fetchAssigned]);
 
   // my bids fetch
   useEffect(() => {
@@ -104,6 +107,19 @@ export default function DeveloperDashboard() {
     setActiveProject(null);
     setActiveTab("messages");
   };
+
+  // BUG-M4 fix: refresh assignedProjects whenever the workspace signals a
+  // meaningful state change (submission, review, completion). This replaces
+  // the stale onComplete-only callback that only handled one action.
+  const handleWorkspaceProjectUpdated = useCallback((updatedProject) => {
+    setAssignedProjects((prev) =>
+      prev.map((p) => p.id === updatedProject.id ? { ...p, ...updatedProject } : p),
+    );
+    // Keep activeProject in sync so the workspace header reflects the change
+    setActiveProject((prev) =>
+      prev && prev.id === updatedProject.id ? { ...prev, ...updatedProject } : prev,
+    );
+  }, []);
 
   // Called by BidModal on successful bid — immediately prepends the new bid
   // to myBids so "Active Bids" updates without a manual refresh
@@ -139,13 +155,8 @@ export default function DeveloperDashboard() {
                 project={activeProject}
                 onBack={() => setActiveProject(null)}
                 onOpenMessages={handleOpenMessages}
-                onComplete={(updatedProject) => {
-                  setAssignedProjects((prev) =>
-                    prev.map((p) =>
-                      p.id === updatedProject.id ? updatedProject : p,
-                    ),
-                  );
-                }}
+                onComplete={handleWorkspaceProjectUpdated}
+                onProjectUpdated={handleWorkspaceProjectUpdated}
               />
             ) : (
               <>

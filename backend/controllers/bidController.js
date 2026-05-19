@@ -63,10 +63,18 @@ async function placeBid(req, res) {
     }
 
     // Record project event
+    // FIX #13 — include actor_name and actor_role (were missing, causing "Unknown" in timeline)
+    const devRes = await pool.query(
+      "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
+      [developerId],
+    ).catch(() => ({ rows: [] }));
+    const dev = devRes.rows[0];
+    const devActorName = dev ? `${dev.first_name || ""} ${dev.last_name || ""}`.trim() || dev.username : "Unknown";
+
     await pool.query(
-      `INSERT INTO project_events (project_id, actor_id, event_type, meta)
-       VALUES ($1, $2, 'bid_placed', $3)`,
-      [id, developerId, JSON.stringify({ amount: Number(amount) })],
+      `INSERT INTO project_events (project_id, actor_id, event_type, meta, actor_name, actor_role)
+       VALUES ($1, $2, 'bid_placed', $3, $4, $5)`,
+      [id, developerId, JSON.stringify({ amount: Number(amount) }), devActorName, dev?.role || "developer"],
     ).catch((e) => logger.error("project_events insert error", e));
 
     res.status(201).json({ message: "Bid placed successfully", bid: result.rows[0] });
@@ -192,17 +200,32 @@ async function acceptBid(req, res) {
       meta: { projectId: Number(projectId), amount: bid.amount },
     });
 
-    // Record project events
+    // Record project events with actor names
+    const userRes = await pool.query(
+      "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
+      [req.user.id],
+    ).catch(() => ({ rows: [] }));
+    const u = userRes.rows[0];
+    const actorName = u ? `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username : "Unknown";
+
+    // FIX #1 — insert only bid_accepted (project_assigned was a redundant duplicate)
     await pool.query(
-      `INSERT INTO project_events (project_id, actor_id, event_type, meta)
-       VALUES ($1, $2, 'bid_accepted', $3), ($1, $2, 'project_assigned', $4)`,
+      `INSERT INTO project_events (project_id, actor_id, event_type, meta, actor_name, actor_role)
+       VALUES ($1, $2, 'bid_accepted', $3, $4, $5)`,
       [
         projectId,
         req.user.id,
         JSON.stringify({ bidId: Number(bidId), developerId: bid.developer_id }),
-        JSON.stringify({ developerId: bid.developer_id }),
+        actorName,
+        u?.role || "client",
       ],
     ).catch((e) => logger.error("project_events insert error", e));
+
+    // Emit workspace activity update
+    req.io.to(`project_${projectId}`).emit("workspace_activity_updated", {
+      projectId: Number(projectId),
+      eventType: "bid_accepted",
+    });
 
     res.json({
       message: "Bid accepted successfully",

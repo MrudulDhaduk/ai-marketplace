@@ -35,6 +35,20 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // ARCH-7 fix: listen for the auth:expired event dispatched by apiRequest
+  // when the server returns 401. This keeps React state in sync with
+  // localStorage so the user is redirected to login instead of seeing a
+  // broken dashboard where all API calls silently fail.
+  useEffect(() => {
+    const handleExpired = () => {
+      setToken(null);
+      setCurrentUser(null);
+      disconnectSocket();
+    };
+    window.addEventListener("auth:expired", handleExpired);
+    return () => window.removeEventListener("auth:expired", handleExpired);
+  }, []);
+
   const login = useCallback(({ token: newToken, user }) => {
     setAuthSession({ token: newToken, user });
     setToken(newToken);

@@ -47,6 +47,15 @@ export async function apiRequest(path, options = {}) {
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
-  if (response.status === 401) clearAuthSession();
+
+  // ARCH-7 fix: on 401, clear the stored session AND dispatch a custom event
+  // so AuthContext can react and update its React state (token, currentUser).
+  // Without this, the context still shows the user as authenticated even though
+  // all subsequent API calls will fail silently.
+  if (response.status === 401) {
+    clearAuthSession();
+    window.dispatchEvent(new Event("auth:expired"));
+  }
+
   return response;
 }

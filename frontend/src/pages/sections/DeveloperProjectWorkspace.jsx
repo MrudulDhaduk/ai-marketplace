@@ -55,7 +55,7 @@ const stageIndex = (status, hasFiles, hasRepo) => {
 };
 
 /* ── component ───────────────────────────────────────── */
-function DeveloperProjectWorkspace({ project, onBack }) {
+function DeveloperProjectWorkspace({ project, onBack, onOpenMessages, onComplete, onProjectUpdated }) {
   const [files, setFiles] = useState([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragIndex, setDragIndex] = useState(null);
@@ -121,7 +121,6 @@ function DeveloperProjectWorkspace({ project, onBack }) {
   /* ── socket ──────────────────────────────────────────── */
   useEffect(() => {
     if (!project?.id) return;
-    socket.emit("join_project", project.id);
 
     const refresh = async () => {
       try {
@@ -138,6 +137,13 @@ function DeveloperProjectWorkspace({ project, onBack }) {
       await refresh();
       pushNotif("📬 Client left new feedback!", "warning");
       setActiveTab("feedback");
+      // BUG-M4 fix: propagate updated project data to parent dashboard
+      if (onProjectUpdated) {
+        try {
+          const res = await apiRequest(`/api/projects/${project.id}`);
+          if (res.ok) onProjectUpdated(await res.json());
+        } catch { /* non-critical */ }
+      }
     };
     const handleProjectSubmitted = async () => {
       const res = await apiRequest(`/api/projects/${project.id}`);
@@ -147,15 +153,43 @@ function DeveloperProjectWorkspace({ project, onBack }) {
       setDemoLink(data?.demo_link || "");
       setNotes(data?.submission_note || "");
       setReviewStatus(data?.review_status || "pending");
+      // FIX #5 — clear reviewed_at from local state on resubmit so stale timestamp disappears
       setProjectData(data);
       if (data?.submission_count) setSubmissionCount(data.submission_count);
     };
 
-    socket.on("project_reviewed", handleProjectReviewed);
-    socket.on("project_submitted", handleProjectSubmitted);
+    // BUG-M2 fix: also listen for workspace_activity_updated so that when the
+    // client approves or requests revision via the activity timeline (entry-level
+    // approval), the developer's top-level reviewStatus and feedback are refreshed.
+    const handleWorkspaceActivityUpdated = async () => {
+      await refresh();
+    };
+
+    // ARCH-8 fix: re-join the project room on socket reconnect so events are
+    // not silently missed after a network blip. The server drops room membership
+    // on disconnect, so we must re-emit join_project every time the socket
+    // reconnects.
+    const handleReconnect = () => {
+      socket.emit("join_project", project.id);
+    };
+
+    // BUG-C7 fix: register listeners BEFORE emitting join_project.
+    // The server's join_project handler is async (DB query) so there is a
+    // window where events could be missed if we emit join first and register
+    // listeners after. Registering first eliminates that window entirely.
+    socket.on("project_reviewed",           handleProjectReviewed);
+    socket.on("project_submitted",          handleProjectSubmitted);
+    socket.on("workspace_activity_updated", handleWorkspaceActivityUpdated);
+    socket.on("connect",                    handleReconnect);
+
+    // Join the project room after listeners are in place
+    socket.emit("join_project", project.id);
+
     return () => {
-      socket.off("project_reviewed", handleProjectReviewed);
-      socket.off("project_submitted", handleProjectSubmitted);
+      socket.off("project_reviewed",           handleProjectReviewed);
+      socket.off("project_submitted",          handleProjectSubmitted);
+      socket.off("workspace_activity_updated", handleWorkspaceActivityUpdated);
+      socket.off("connect",                    handleReconnect);
     };
   }, [project?.id, token, pushNotif]);
 
@@ -240,26 +274,46 @@ function DeveloperProjectWorkspace({ project, onBack }) {
 
   /* ── submit deliverables ─────────────────────────────── */
   const handleSubmitDeliverables = async () => {
-    if (!repoLink) { setSubmissionError("Repository link is required"); return; }
+    if (!repoLink.trim()) { setSubmissionError("Repository link is required"); return; }
+    // BUG-C8 fix: always clear the error at the very start of a new attempt,
+    // including when called directly from the confirm modal
     setSubmissionError("");
     setSubmissionState("submitting");
     setShowConfirm(false);
     try {
       const res = await apiRequest(`/projects/${project.id}/submit`, { method: "POST", body: JSON.stringify({ repoLink, demoLink, notes }) });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+      // BUG-C1 fix: surface the actual server error message (e.g. "Repository
+      // link must be a valid HTTPS URL") instead of a generic fallback
+      if (!res.ok) throw new Error(data.message || "Submission failed");
       setSubmissionState("submitted");
       setSubmissionCount((c) => c + 1);
       pushNotif("🚀 Work submitted for review!", "success");
       setTimeout(() => setSubmissionState("idle"), 3000);
     } catch (err) {
       setSubmissionState("idle");
-      setSubmissionError("Submission failed. Please try again.");
+      // Use the real message from the server when available
+      setSubmissionError(err.message || "Submission failed. Please try again.");
     }
   };
 
-  /* ── derived ─────────────────────────────────────────── */
-  if (!project) return null;
+  /* ── mark project complete ───────────────────────────── */
+  const handleMarkComplete = async () => {
+    if (reviewStatus !== "approved") return;
+    try {
+      const res = await apiRequest(`/projects/${project.id}/complete`, { method: "PUT" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      const updated = { ...projectData, status: "completed" };
+      setProjectData(updated);
+      pushNotif("🎉 Project marked as complete!", "success");
+      // BUG-M4 fix: notify parent dashboard so the project card updates
+      if (onComplete) onComplete(updated);
+      if (onProjectUpdated) onProjectUpdated(updated);
+    } catch (err) {
+      pushNotif(err.message || "Failed to mark complete", "error");
+    }
+  };
 
   const isLocked = reviewStatus === "approved" || reviewStatus === "pending";
   const currentStageIdx = stageIndex(reviewStatus, files.length > 0, !!repoLink);
@@ -506,7 +560,7 @@ function DeveloperProjectWorkspace({ project, onBack }) {
                       placeholder="https://github.com/you/project"
                       className="dd-input"
                       value={repoLink}
-                      onChange={(e) => setRepoLink(e.target.value)}
+                      onChange={(e) => { setRepoLink(e.target.value); if (submissionError) setSubmissionError(""); }}
                       disabled={isLocked}
                     />
                     {repoLink && (
@@ -528,7 +582,7 @@ function DeveloperProjectWorkspace({ project, onBack }) {
                       placeholder="https://your-demo.vercel.app"
                       className="dd-input"
                       value={demoLink}
-                      onChange={(e) => setDemoLink(e.target.value)}
+                      onChange={(e) => { setDemoLink(e.target.value); if (submissionError) setSubmissionError(""); }}
                       disabled={isLocked}
                     />
                     {demoLink && (
@@ -718,8 +772,8 @@ function DeveloperProjectWorkspace({ project, onBack }) {
             </p>
           </div>
 
-          {/* MARK COMPLETE */}
-          {project.status === "active" && (
+          {/* MARK COMPLETE — FIX #11: wired onClick + use live projectData.status */}
+          {(projectData?.status ?? project.status) === "active" && (
             <div className="dd-card" style={{ "--ci": 8 }}>
               <h3 className="dd-card-title">✅ Ready to Wrap Up?</h3>
               <p className="dd-card-desc">
@@ -727,6 +781,7 @@ function DeveloperProjectWorkspace({ project, onBack }) {
               </p>
               <button
                 className="dd-bid-btn"
+                onClick={handleMarkComplete}
                 disabled={reviewStatus !== "approved"}
                 title={reviewStatus !== "approved" ? "Requires client approval first" : ""}
               >

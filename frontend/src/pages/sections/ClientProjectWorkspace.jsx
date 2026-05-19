@@ -143,7 +143,7 @@ function SectionTitle({ icon, title, badge, badgeColor }) {
 /* ══════════════════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════════════════ */
-export default function ClientProjectWorkspace({ project, onBack, onNavigateToMessages }) {
+export default function ClientProjectWorkspace({ project, onBack, onNavigateToMessages, onProjectUpdated }) {
   /* ── existing state (untouched) ─────────────────────────── */
   const [files,               setFiles]               = useState([]);
   const [deliverables,        setDeliverables]        = useState({ repoLink: "", demoLink: "", notes: "" });
@@ -155,6 +155,10 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
   const [loadingDeliverables, setLoadingDeliverables] = useState(false);
   const [error,               setError]               = useState("");
   const [submittedAt,         setSubmittedAt]         = useState(null);
+  // ARCH-1 / BUG-M3 fix: track project status in local state so the status
+  // badge reflects the live value (e.g. "Completed" after approval) rather
+  // than the stale prop passed in from the parent dashboard.
+  const [projectStatus,       setProjectStatus]       = useState(project?.status || "active");
 
   /* ── new state ──────────────────────────────────────────── */
   const [showApproveConfirm,  setShowApproveConfirm]  = useState(false);
@@ -166,7 +170,7 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
   const [totalSubmissions,    setTotalSubmissions]    = useState(0);
   const [developerStatus,     setDeveloperStatus]     = useState("offline"); // online/offline/away
 
-  const statusMeta  = STATUS_META[project?.status] || STATUS_META.draft;
+  const statusMeta  = STATUS_META[projectStatus] || STATUS_META.draft;
   const token       = useMemo(() => localStorage.getItem("token"), []);
   const currentStage = getStageFromStatus(reviewStatus, files.length);
 
@@ -221,8 +225,10 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
         });
         setReviewStatus(found?.review_status || "pending");
         setSubmittedAt(found?.submitted_at ?? null);
+        // ARCH-1 fix: sync local project status from the fresh fetch
+        if (found?.status) setProjectStatus(found.status);
+        // FIX #6 — is_urgent now persisted in DB; read it from the response
         setIsUrgent(found?.is_urgent ?? false);
-        // derive total submissions count if available
         setTotalSubmissions(found?.submission_count ?? 0);
       } catch (e) {
         if (!cancelled) {
@@ -240,7 +246,6 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
 
   useEffect(() => {
     if (!project?.id) return;
-    socket.emit("join_project", project.id);
 
     const handleProjectSubmitted = async () => {
       try {
@@ -256,7 +261,10 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
         setSubmittedAt(data?.submitted_at ?? null);
         // new: flag new update
         setHasNewUpdate(true);
-        setTotalSubmissions(s => s + 1);
+        // BUG-M8 fix: use the server-side count from the refetch instead of
+        // blindly incrementing, which would double-count on reconnect replays
+        // or when the developer has multiple tabs open.
+        setTotalSubmissions(data?.submission_count ?? 0);
       } catch (err) {
         console.error("Failed to fetch updated deliverables", err);
       }
@@ -275,14 +283,39 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
       setSubmittedAt(updated?.submitted_at ?? null);
     };
 
+    // ARCH-9/10 fix: refresh the file list when the developer deletes or
+    // reorders files so the client sees the change in realtime.
+    const handleWorkspaceActivityUpdated = async ({ eventType } = {}) => {
+      if (eventType === "file_deleted" || eventType === "files_reordered" || eventType === "file_uploaded") {
+        try {
+          const res = await apiRequest(`/projects/${project.id}/files`);
+          if (res.ok) setFiles(await res.json());
+        } catch { /* non-critical */ }
+      }
+    };
+
     /* developer_status socket event removed — not emitted by server */
 
-    socket.on("project_submitted", handleProjectSubmitted);
-    socket.on("project_reviewed",  handleProjectReviewed);
+    // ARCH-8 fix: re-join the project room on socket reconnect so events are
+    // not silently missed after a network blip.
+    const handleReconnect = () => {
+      socket.emit("join_project", project.id);
+    };
+
+    // BUG-C7 fix: register listeners BEFORE emitting join_project so no
+    // events are missed during the async server-side room join.
+    socket.on("project_submitted",          handleProjectSubmitted);
+    socket.on("project_reviewed",           handleProjectReviewed);
+    socket.on("workspace_activity_updated", handleWorkspaceActivityUpdated);
+    socket.on("connect",                    handleReconnect);
+
+    socket.emit("join_project", project.id);
 
     return () => {
-      socket.off("project_submitted", handleProjectSubmitted);
-      socket.off("project_reviewed",  handleProjectReviewed);
+      socket.off("project_submitted",          handleProjectSubmitted);
+      socket.off("project_reviewed",           handleProjectReviewed);
+      socket.off("workspace_activity_updated", handleWorkspaceActivityUpdated);
+      socket.off("connect",                    handleReconnect);
     };
   }, [project?.id, token]);
 
@@ -296,6 +329,30 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
       if (!res.ok) throw new Error(`Failed to submit review: ${res.status}`);
       const data = await res.json();
       setReviewStatus(data.project.review_status);
+
+      // BUG-M3 / ARCH-15 fix: refetch the full project so submittedAt,
+      // deliverables, and totalSubmissions are all up-to-date. Also notify
+      // the parent dashboard so its projects list reflects the new status
+      // (e.g. "Active" → "Completed") without requiring a page refresh.
+      try {
+        const refreshRes = await apiRequest(`/api/projects/${project.id}`);
+        if (refreshRes.ok) {
+          const refreshed = await refreshRes.json();
+          setDeliverables({
+            repoLink: safeUrl(refreshed?.deliverable_link),
+            demoLink: safeUrl(refreshed?.demo_link),
+            notes: typeof refreshed?.submission_note === "string" ? refreshed.submission_note : "",
+          });
+          setSubmittedAt(refreshed?.submitted_at ?? null);
+          setTotalSubmissions(refreshed?.submission_count ?? 0);
+          // ARCH-1 fix: update local status so the badge flips immediately
+          if (refreshed?.status) setProjectStatus(refreshed.status);
+          if (onProjectUpdated) onProjectUpdated(refreshed);
+        }
+      } catch (refreshErr) {
+        console.error("Failed to refresh project after review", refreshErr);
+      }
+
       // push to local review history
       setReviewHistory(prev => [{
         action,
@@ -327,9 +384,10 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
       }
 
       if (actionKey === "request_update") {
+        // FIX #3 — use the dedicated /request-update endpoint (no longer aliases to revision)
         const res = await apiRequest(`/projects/${project.id}/request-update`, {
           method: "POST",
-          body: JSON.stringify({ action: "revision", feedback: "Client requested a status update." }),
+          body: JSON.stringify({ feedback: "Client requested a status update." }),
         });
         if (res.ok) {
           flashAction("📣 Update requested — developer has been notified.");
@@ -340,21 +398,27 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
 
       if (actionKey === "urgent") {
         const next = !isUrgent;
-        setIsUrgent(next);
-        // Notify developer via the request-update mechanism
-        if (next) {
-          await apiRequest(`/projects/${project.id}/request-update`, {
-            method: "POST",
-            body: JSON.stringify({ action: "revision", feedback: "🚨 This project has been marked as URGENT by the client. Please prioritise." }),
-          }).catch(() => {});
-          flashAction("🚨 Marked as urgent — developer notified.");
+        // FIX #6 — persist is_urgent to the database via a dedicated PATCH
+        const res = await apiRequest(`/projects/${project.id}/urgent`, {
+          method: "PATCH",
+          body: JSON.stringify({ is_urgent: next }),
+        });
+        if (res.ok) {
+          setIsUrgent(next);
+          if (next) {
+            flashAction("🚨 Marked as urgent — developer notified.");
+          } else {
+            flashAction("🔕 Urgency flag removed.");
+          }
         } else {
-          flashAction("🔕 Urgency flag removed.");
+          flashAction("Failed to update urgency flag.");
         }
       }
 
       if (actionKey === "reopen") {
-        // Reset review status back to pending so developer can resubmit
+        // FIX #15 — reopen uses the review endpoint with action:"revision" but
+        // the backend now records it as a proper revision_requested event with
+        // clear feedback so it's distinguishable in the timeline
         const res = await apiRequest(`/projects/${project.id}/review`, {
           method: "PUT",
           body: JSON.stringify({ action: "revision", feedback: "Client has requested additional work. Please resubmit when ready." }),
@@ -549,11 +613,11 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
           <div className="dd-card" style={{ "--ci": 4 }}>
             <SectionTitle
               icon="📡"
-              title="Project Activity"
+              title="Workspace Activity"
               badge={hasNewUpdate ? "New" : undefined}
               badgeColor="var(--cyan)"
             />
-            <SubmissionHistory projectId={project.id} token={token} />
+            <SubmissionHistory projectId={project.id} token={token} isClient={true} />
           </div>
 
         </div>

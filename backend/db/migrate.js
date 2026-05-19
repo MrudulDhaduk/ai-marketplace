@@ -1,13 +1,11 @@
 /**
  * migrate.js — Node.js migration runner
- * Runs all SQL migration files in order against the configured database.
- * Works on Windows without requiring psql in PATH.
+ * Tracks applied migrations in a schema_migrations table so each file
+ * only ever runs once. Safe to re-run at any time.
  *
  * Usage:
  *   node backend/db/migrate.js
  *   npm run migrate
- *
- * Requires DATABASE_URL or individual DB env vars in .env
  */
 
 require("dotenv").config();
@@ -15,7 +13,7 @@ const fs   = require("fs");
 const path = require("path");
 const { Pool } = require("pg");
 
-// ── DB connection (mirrors config/db.js logic) ────────────────────────────
+// ── DB connection ─────────────────────────────────────────────────────────
 const pool = new Pool(
   process.env.DATABASE_URL
     ? {
@@ -32,15 +30,18 @@ const pool = new Pool(
       },
 );
 
-// ── Migration files in execution order ───────────────────────────────────
+// ── All migration files in execution order ────────────────────────────────
 const MIGRATIONS_DIR = path.join(__dirname, "migrations");
 
 const MIGRATION_FILES = [
+  "000_base_schema.sql",
   "001_security_indexes.sql",
   "002_notifications.sql",
   "003_messages.sql",
   "004_project_events.sql",
   "005_required_additions.sql",
+  "006_workspace_activity.sql",
+  "007_schema_stabilization.sql",
 ];
 
 async function runMigrations() {
@@ -49,7 +50,24 @@ async function runMigrations() {
   try {
     console.log("🔌 Connected to database\n");
 
+    // Ensure tracking table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        filename   VARCHAR(255) PRIMARY KEY,
+        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // Fetch already-applied migrations
+    const applied = await client.query("SELECT filename FROM schema_migrations");
+    const appliedSet = new Set(applied.rows.map((r) => r.filename));
+
     for (const file of MIGRATION_FILES) {
+      if (appliedSet.has(file)) {
+        console.log(`⏭️  ${file} — already applied, skipping`);
+        continue;
+      }
+
       const filePath = path.join(MIGRATIONS_DIR, file);
 
       if (!fs.existsSync(filePath)) {
@@ -60,23 +78,24 @@ async function runMigrations() {
       const sql = fs.readFileSync(filePath, "utf8");
 
       try {
+        await client.query("BEGIN");
         await client.query(sql);
+        await client.query(
+          "INSERT INTO schema_migrations (filename) VALUES ($1)",
+          [file],
+        );
+        await client.query("COMMIT");
         console.log(`✅ ${file}`);
       } catch (err) {
-        // Some statements (like ADD CONSTRAINT IF NOT EXISTS via DO block)
-        // may produce non-fatal notices — only abort on real errors
-        if (err.severity === "ERROR" || err.severity === "FATAL") {
-          console.error(`❌ ${file} failed:\n   ${err.message}`);
-          throw err;
-        } else {
-          console.log(`✅ ${file} (with notice: ${err.message})`);
-        }
+        await client.query("ROLLBACK");
+        console.error(`❌ ${file} failed:\n   ${err.message}`);
+        throw err;
       }
     }
 
     console.log("\n✅ All migrations complete.");
   } catch (err) {
-    console.error("\n❌ Migration failed:", err.message);
+    console.error("\n❌ Migration runner failed:", err.message);
     process.exit(1);
   } finally {
     client.release();

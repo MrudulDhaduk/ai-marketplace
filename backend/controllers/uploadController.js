@@ -75,6 +75,37 @@ function uploadFiles(req, res) {
           insertedRows.push(inserted.rows[0]);
         }
 
+        // Record workspace activity event for file upload
+        try {
+          const userRes = await pool.query(
+            "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
+            [req.user.id],
+          );
+          const u = userRes.rows[0];
+          const actorName = u ? `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username : "Unknown";
+          const fileNames = insertedRows.map((f) => f.file_name);
+
+          await pool.query(
+            `INSERT INTO project_events (project_id, actor_id, event_type, meta, actor_name, actor_role)
+             VALUES ($1, $2, 'file_uploaded', $3, $4, $5)`,
+            [
+              id,
+              req.user.id,
+              JSON.stringify({ count: insertedRows.length, files: fileNames }),
+              actorName,
+              u?.role || "developer",
+            ],
+          );
+
+          // Emit realtime update to project room
+          req.io.to(`project_${id}`).emit("workspace_activity_updated", {
+            projectId: Number(id),
+            eventType: "file_uploaded",
+          });
+        } catch (evtErr) {
+          logger.error("file_uploaded event insert error", evtErr);
+        }
+
         res.json({ message: "Files uploaded successfully", files: insertedRows });
       } catch (error) {
         await cleanup();
@@ -122,7 +153,7 @@ async function deleteFile(req, res) {
     const { id } = req.params;
 
     const fileResult = await pool.query(
-      `SELECT pf.file_name, p.assigned_developer_id
+      `SELECT pf.file_name, pf.project_id, p.assigned_developer_id
        FROM project_files pf
        INNER JOIN projects p ON p.id = pf.project_id
        WHERE pf.id = $1`,
@@ -131,14 +162,16 @@ async function deleteFile(req, res) {
 
     if (!fileResult.rows.length) return res.status(404).json({ message: "File not found" });
 
+    const { file_name, project_id, assigned_developer_id } = fileResult.rows[0];
+
     if (
-      fileResult.rows[0].assigned_developer_id == null ||
-      Number(fileResult.rows[0].assigned_developer_id) !== Number(req.user.id)
+      assigned_developer_id == null ||
+      Number(assigned_developer_id) !== Number(req.user.id)
     ) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    const filePath = safeUploadPath(fileResult.rows[0].file_name);
+    const filePath = safeUploadPath(file_name);
 
     try {
       await fs.unlink(filePath);
@@ -147,6 +180,31 @@ async function deleteFile(req, res) {
     }
 
     await pool.query("DELETE FROM project_files WHERE id = $1", [id]);
+
+    // ARCH-9 fix: record a file_deleted event and emit workspace_activity_updated
+    // so the client's file list and activity feed update in realtime.
+    try {
+      const userRes = await pool.query(
+        "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
+        [req.user.id],
+      );
+      const u = userRes.rows[0];
+      const actorName = u ? `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username : "Unknown";
+
+      await pool.query(
+        `INSERT INTO project_events (project_id, actor_id, event_type, meta, actor_name, actor_role)
+         VALUES ($1, $2, 'file_deleted', $3, $4, $5)`,
+        [project_id, req.user.id, JSON.stringify({ file: file_name }), actorName, u?.role || "developer"],
+      );
+
+      req.io.to(`project_${project_id}`).emit("workspace_activity_updated", {
+        projectId: Number(project_id),
+        eventType: "file_deleted",
+      });
+    } catch (evtErr) {
+      logger.error("file_deleted event insert error", evtErr);
+    }
+
     res.json({ message: "File deleted successfully" });
   } catch (err) {
     logger.error("deleteFile error", err);
@@ -174,7 +232,7 @@ async function reorderFiles(req, res) {
 
     const fileIds = updates.map((item) => item.id);
     const ownership = await pool.query(
-      `SELECT COUNT(*)::int AS cnt
+      `SELECT COUNT(*)::int AS cnt, MIN(p.id) AS project_id
        FROM project_files pf
        INNER JOIN projects p ON p.id = pf.project_id
        WHERE pf.id = ANY($1::int[])
@@ -186,6 +244,8 @@ async function reorderFiles(req, res) {
     if (ownership.rows[0].cnt !== updates.length) {
       return res.status(403).json({ message: "Unauthorized" });
     }
+
+    const projectId = ownership.rows[0].project_id;
 
     const client = await pool.connect();
     try {
@@ -202,6 +262,15 @@ async function reorderFiles(req, res) {
       throw transactionError;
     } finally {
       client.release();
+    }
+
+    // ARCH-10 fix: emit a socket event so the client's file list order updates
+    // in realtime when the developer reorders files.
+    if (projectId) {
+      req.io.to(`project_${projectId}`).emit("workspace_activity_updated", {
+        projectId: Number(projectId),
+        eventType: "files_reordered",
+      });
     }
 
     res.json({ message: "Files reordered successfully" });

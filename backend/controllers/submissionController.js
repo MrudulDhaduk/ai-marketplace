@@ -5,6 +5,7 @@ const { createNotification } = require("../services/notificationService");
 
 /** POST /projects/:id/submit */
 async function submitProject(req, res) {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const { repoLink, demoLink, notes } = req.body;
@@ -12,69 +13,108 @@ async function submitProject(req, res) {
     const error = validateSubmission({ repoLink, demoLink });
     if (error) return res.status(400).json({ message: error });
 
-    const projectCheck = await pool.query(
-      "SELECT assigned_developer_id FROM projects WHERE id = $1",
+    await client.query("BEGIN");
+
+    // FIX #7 — lock row and check both ownership AND review_status
+    const projectCheck = await client.query(
+      "SELECT assigned_developer_id, review_status, client_id, title FROM projects WHERE id = $1 FOR UPDATE",
       [id],
     );
 
-    if (!projectCheck.rows.length) return res.status(404).json({ message: "Project not found" });
+    if (!projectCheck.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Project not found" });
+    }
 
-    if (Number(projectCheck.rows[0].assigned_developer_id) !== Number(req.user.id)) {
+    const proj = projectCheck.rows[0];
+
+    if (Number(proj.assigned_developer_id) !== Number(req.user.id)) {
+      await client.query("ROLLBACK");
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    await pool.query(
+    // FIX #7 — backend guard: block resubmit while already under review
+    if (proj.review_status === "pending") {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: "A submission is already under review. Wait for client feedback before resubmitting." });
+    }
+
+    await client.query(
       `INSERT INTO project_submissions (project_id, repo_link, demo_link, notes)
        VALUES ($1, $2, $3, $4)`,
       [id, repoLink.trim(), demoLink?.trim() || null, notes?.trim() || null],
     );
 
-    const result = await pool.query(
+    // FIX #5 — also clear reviewed_at on resubmit so stale timestamp is gone
+    const result = await client.query(
       `UPDATE projects
        SET deliverable_link = $1,
            demo_link = $2,
            submission_note = $3,
            submitted_at = NOW(),
            review_status = 'pending',
-           review_feedback = NULL
+           review_feedback = NULL,
+           reviewed_at = NULL
        WHERE id = $4
        RETURNING *`,
       [repoLink.trim(), demoLink?.trim() || null, notes?.trim() || null, id],
     );
 
+    // FIX #4 — resolve any open revision_requested entries on the activity timeline
+    await client.query(
+      `UPDATE project_events
+       SET approval_status = 'resolved', actioned_at = NOW()
+       WHERE project_id = $1
+         AND approval_status = 'revision_requested'`,
+      [id],
+    );
+
+    // Record project event INSIDE the transaction so it commits atomically
+    const userRes = await client.query(
+      "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
+      [req.user.id],
+    ).catch(() => ({ rows: [] }));
+    const u = userRes.rows[0];
+    const actorName = u ? `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username : "Unknown";
+
+    await client.query(
+      `INSERT INTO project_events (project_id, actor_id, event_type, meta, actor_name, actor_role)
+       VALUES ($1, $2, 'submission_added', $3, $4, $5)`,
+      [id, req.user.id, JSON.stringify({ repoLink: repoLink.trim(), demoLink: demoLink?.trim() || null }), actorName, u?.role || "developer"],
+    );
+
+    await client.query("COMMIT");
+
+    // FIX #2 — emit sockets AFTER commit so activity feed is consistent
     req.io.to(`project_${id}`).emit("project_submitted", {
       type: "project_submitted",
       projectId: id,
       message: "Project deliverables submitted for review",
     });
     req.io.to(`project_${id}`).emit("submission_history_updated");
+    req.io.to(`project_${id}`).emit("workspace_activity_updated", {
+      projectId: Number(id),
+      eventType: "submission_added",
+    });
 
     // Notify client
-    const projectInfo = await pool.query(
-      "SELECT client_id, title FROM projects WHERE id = $1",
-      [id],
-    );
-    if (projectInfo.rows[0]?.client_id) {
+    if (proj.client_id) {
       await createNotification({
         io: req.io,
-        userId: projectInfo.rows[0].client_id,
+        userId: proj.client_id,
         type: "submission_added",
-        message: `New submission on "${projectInfo.rows[0].title}"`,
+        message: `New submission on "${proj.title}"`,
         meta: { projectId: Number(id) },
       });
     }
 
-    // Record project event
-    await pool.query(
-      `INSERT INTO project_events (project_id, actor_id, event_type, meta)
-       VALUES ($1, $2, 'submission_added', $3)`,
-      [id, req.user.id, JSON.stringify({ repoLink: repoLink.trim() })],
-    ).catch((e) => logger.error("project_events insert error", e));
-
     res.json(result.rows[0]);
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
     logger.error("submitProject error", err);
     res.status(500).json({ message: "Submission failed" });
+  } finally {
+    client.release();
   }
 }
 
@@ -91,8 +131,10 @@ async function getSubmissions(req, res) {
     const project = projectResult.rows[0];
     if (!project) return res.status(404).json({ message: "Project not found" });
 
+    // BUG-C6 fix: use Number() coercion on both sides so integer DB values
+    // compare correctly against string JWT user ids
     if (
-      project.client_id !== req.user.id &&
+      Number(project.client_id) !== Number(req.user.id) &&
       Number(project.assigned_developer_id) !== Number(req.user.id)
     ) {
       return res.status(403).json({ message: "Unauthorized" });
@@ -130,16 +172,39 @@ async function addSubmissionNote(req, res) {
     const userId = req.user.id;
     const p = project.rows[0];
 
-    if (p.client_id !== userId && Number(p.assigned_developer_id) !== Number(userId)) {
-      return res.status(403).json({ message: "Unauthorized" });
+    // FIX #9 — only the assigned developer may add progress notes
+    if (Number(p.assigned_developer_id) !== Number(userId)) {
+      return res.status(403).json({ message: "Only the assigned developer can add progress notes" });
     }
 
+    // BUG-C10 fix: insert project_events BEFORE emitting socket events so that
+    // any client that immediately re-fetches the activity feed on receiving the
+    // socket event will find the new row already committed.
     const result = await pool.query(
       "INSERT INTO project_submissions (project_id, notes) VALUES ($1, $2) RETURNING *",
       [projectId, notes.trim()],
     );
 
+    // Record workspace activity event first
+    const userRes = await pool.query(
+      "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
+      [userId],
+    ).catch(() => ({ rows: [] }));
+    const u = userRes.rows[0];
+    const actorName = u ? `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username : "Unknown";
+
+    await pool.query(
+      `INSERT INTO project_events (project_id, actor_id, event_type, meta, actor_name, actor_role)
+       VALUES ($1, $2, 'note_added', $3, $4, $5)`,
+      [projectId, userId, JSON.stringify({ notes: notes.trim(), submissionId: result.rows[0].id }), actorName, u?.role || "developer"],
+    ).catch((e) => logger.error("project_events note_added insert error", e));
+
+    // Emit AFTER the DB write so listeners see consistent data
     req.io.to(`project_${projectId}`).emit("submission_history_updated");
+    req.io.to(`project_${projectId}`).emit("workspace_activity_updated", {
+      projectId: Number(projectId),
+      eventType: "note_added",
+    });
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (err) {
@@ -168,8 +233,10 @@ async function updateSubmission(req, res) {
     const userId = req.user.id;
     const p = project.rows[0];
 
-    if (p.client_id !== userId && Number(p.assigned_developer_id) !== Number(userId)) {
-      return res.status(403).json({ message: "Unauthorized" });
+    // BUG-M6 fix: only the assigned developer may edit their own notes.
+    // The client should be able to read notes but never modify them.
+    if (Number(p.assigned_developer_id) !== Number(userId)) {
+      return res.status(403).json({ message: "Only the assigned developer can edit submission notes" });
     }
 
     const result = await pool.query(
@@ -203,8 +270,10 @@ async function deleteSubmission(req, res) {
     const userId = req.user.id;
     const p = project.rows[0];
 
-    if (p.client_id !== userId && Number(p.assigned_developer_id) !== Number(userId)) {
-      return res.status(403).json({ message: "Unauthorized" });
+    // BUG-M7 fix: only the assigned developer may delete their own submission
+    // entries. Allowing the client to delete would corrupt the audit trail.
+    if (Number(p.assigned_developer_id) !== Number(userId)) {
+      return res.status(403).json({ message: "Only the assigned developer can delete submission entries" });
     }
 
     const result = await pool.query(

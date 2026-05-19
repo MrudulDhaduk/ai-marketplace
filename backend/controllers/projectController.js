@@ -81,8 +81,9 @@ async function getClientProjects(req, res) {
     const [dataResult, countResult] = await Promise.all([
       pool.query(
         `SELECT id, title, description, min_budget, max_budget, due_date, status,
-                tags, review_status, assigned_developer_id, submitted_at,
-                (SELECT COUNT(*)::int FROM bids WHERE project_id = projects.id) AS bids
+                tags, review_status, assigned_developer_id, submitted_at, is_urgent,
+                (SELECT COUNT(*)::int FROM bids WHERE project_id = projects.id) AS bids,
+                (SELECT COUNT(*)::int FROM project_submissions ps WHERE ps.project_id = projects.id) AS submission_count
          FROM projects
          WHERE client_id = $1
          ORDER BY id DESC
@@ -107,13 +108,23 @@ async function getClientProjects(req, res) {
 /** GET /api/projects/:id */
 async function getProject(req, res) {
   try {
-    const result = await pool.query("SELECT * FROM projects WHERE id = $1", [req.params.id]);
+    // BUG-C2 fix: compute submission_count inline so both workspaces get a
+    // real count on every fetch instead of always receiving undefined/0.
+    const result = await pool.query(
+      `SELECT p.*,
+              (SELECT COUNT(*)::int
+               FROM project_submissions ps
+               WHERE ps.project_id = p.id) AS submission_count
+       FROM projects p
+       WHERE p.id = $1`,
+      [req.params.id],
+    );
     const project = result.rows[0];
 
     if (!project) return res.status(404).json({ message: "Not found" });
 
     if (
-      project.client_id !== req.user.id &&
+      Number(project.client_id) !== Number(req.user.id) &&
       Number(project.assigned_developer_id) !== Number(req.user.id)
     ) {
       return res.status(403).json({ message: "Unauthorized" });
@@ -215,7 +226,8 @@ async function getAssignedProjects(req, res) {
       pool.query(
         `SELECT id, title, description, min_budget, max_budget, due_date, status,
                 tags, review_status, review_feedback, client_id, assigned_developer_id,
-                deliverable_link, demo_link, submitted_at, submitted_at
+                deliverable_link, demo_link, submitted_at, is_urgent,
+                (SELECT COUNT(*)::int FROM project_submissions ps WHERE ps.project_id = projects.id) AS submission_count
          FROM projects
          WHERE assigned_developer_id = $1
            AND status IN ('active', 'completed')
@@ -247,7 +259,7 @@ async function completeProject(req, res) {
     const { id } = req.params;
 
     const projectCheck = await pool.query(
-      "SELECT assigned_developer_id FROM projects WHERE id = $1",
+      "SELECT assigned_developer_id, review_status FROM projects WHERE id = $1",
       [id],
     );
 
@@ -255,8 +267,15 @@ async function completeProject(req, res) {
       return res.status(404).json({ message: "Project not found" });
     }
 
-    if (Number(projectCheck.rows[0].assigned_developer_id) !== Number(req.user.id)) {
+    const proj = projectCheck.rows[0];
+
+    if (Number(proj.assigned_developer_id) !== Number(req.user.id)) {
       return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // FIX #8 — require client approval before marking complete
+    if (proj.review_status !== "approved") {
+      return res.status(409).json({ message: "Project must be approved by the client before it can be marked complete" });
     }
 
     const result = await pool.query(
@@ -286,7 +305,7 @@ async function reviewProject(req, res) {
     }
 
     const project = await pool.query(
-      "SELECT client_id, assigned_developer_id, title FROM projects WHERE id = $1",
+      "SELECT client_id, assigned_developer_id, title, review_status, status FROM projects WHERE id = $1",
       [id],
     );
 
@@ -296,11 +315,29 @@ async function reviewProject(req, res) {
     const reviewStatus = action === "approve" ? "approved" : "revision_requested";
     const eventType = action === "approve" ? "project_approved" : "revision_requested";
 
-    const result = await pool.query(
-      `UPDATE projects SET review_status = $1, review_feedback = $2, reviewed_at = NOW()
-       WHERE id = $3 RETURNING *`,
-      [reviewStatus, feedback?.trim() || null, id],
-    );
+    // BUG-C5 fix: when requesting a revision on an already-completed/approved
+    // project (i.e. a "reopen"), we must also revert status back to 'active'.
+    // Without this the DB CHECK constraint
+    //   NOT (status = 'completed' AND review_status = 'revision_requested')
+    // fires a constraint violation and the request silently 500s.
+    let updateQuery;
+    if (action === "approve") {
+      // Approving always advances status to completed
+      updateQuery = `UPDATE projects
+         SET review_status = $1, review_feedback = $2, reviewed_at = NOW(), status = 'completed'
+         WHERE id = $3 RETURNING *`;
+    } else {
+      // Requesting revision: if the project is currently completed (reopen
+      // scenario), revert status to active so the constraint is satisfied
+      updateQuery = `UPDATE projects
+         SET review_status = $1,
+             review_feedback = $2,
+             reviewed_at = NOW(),
+             status = CASE WHEN status = 'completed' THEN 'active' ELSE status END
+         WHERE id = $3 RETURNING *`;
+    }
+
+    const result = await pool.query(updateQuery, [reviewStatus, feedback?.trim() || null, id]);
 
     if (!result.rows.length) return res.status(404).json({ message: "Project not found" });
 
@@ -313,6 +350,10 @@ async function reviewProject(req, res) {
       reviewStatus,
       feedback,
       message: action === "approve" ? "Your project was approved! 🎉" : "Your project needs revision",
+    });
+    req.io.to(`project_${id}`).emit("workspace_activity_updated", {
+      projectId: Number(id),
+      eventType,
     });
 
     // Persist notification for developer
@@ -328,11 +369,18 @@ async function reviewProject(req, res) {
       });
     }
 
-    // Record project event
+    // Record project event with actor name
+    const userRes = await pool.query(
+      "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
+      [req.user.id],
+    ).catch(() => ({ rows: [] }));
+    const u = userRes.rows[0];
+    const actorName = u ? `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username : "Unknown";
+
     await pool.query(
-      `INSERT INTO project_events (project_id, actor_id, event_type, meta)
-       VALUES ($1, $2, $3, $4)`,
-      [id, req.user.id, eventType, JSON.stringify({ feedback: feedback?.trim() || null })],
+      `INSERT INTO project_events (project_id, actor_id, event_type, meta, actor_name, actor_role)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, req.user.id, eventType, JSON.stringify({ feedback: feedback?.trim() || null }), actorName, u?.role || "client"],
     ).catch((e) => logger.error("project_events insert error", e));
 
     res.json({ message: `Project ${reviewStatus}`, project: result.rows[0] });
@@ -342,9 +390,141 @@ async function reviewProject(req, res) {
   }
 }
 
+// FIX #3 — requestUpdate is a distinct "ping" action, NOT a revision
+// It sends a notification without creating a duplicate revision_requested event
 async function requestUpdate(req, res) {
-  req.body = { ...req.body, action: "revision" };
-  return reviewProject(req, res);
+  try {
+    const { id } = req.params;
+    const { feedback } = req.body;
+
+    const project = await pool.query(
+      "SELECT client_id, assigned_developer_id, title FROM projects WHERE id = $1",
+      [id],
+    );
+
+    if (!project.rows.length) return res.status(404).json({ message: "Project not found" });
+    if (project.rows[0].client_id !== req.user.id) return res.status(403).json({ message: "Not your project" });
+
+    const proj = project.rows[0];
+
+    if (!proj.assigned_developer_id) {
+      return res.status(400).json({ message: "No developer assigned to this project" });
+    }
+
+    // Notify developer without touching review_status or inserting a revision event
+    await createNotification({
+      io: req.io,
+      userId: Number(proj.assigned_developer_id),
+      type: "update_requested",
+      message: feedback?.trim() || `Client requested a status update on "${proj.title}"`,
+      meta: { projectId: Number(id) },
+    });
+
+    // Record as a distinct system event type so it doesn't pollute the revision flow
+    const userRes = await pool.query(
+      "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
+      [req.user.id],
+    ).catch(() => ({ rows: [] }));
+    const u = userRes.rows[0];
+    const actorName = u ? `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username : "Unknown";
+
+    await pool.query(
+      `INSERT INTO project_events (project_id, actor_id, event_type, meta, actor_name, actor_role)
+       VALUES ($1, $2, 'update_requested', $3, $4, $5)`,
+      [id, req.user.id, JSON.stringify({ feedback: feedback?.trim() || null }), actorName, u?.role || "client"],
+    ).catch((e) => logger.error("project_events insert error", e));
+
+    req.io.to(`project_${id}`).emit("workspace_activity_updated", {
+      projectId: Number(id),
+      eventType: "update_requested",
+    });
+
+    res.json({ message: "Update request sent to developer" });
+  } catch (err) {
+    logger.error("requestUpdate error", err);
+    res.status(500).json({ message: "Error sending update request" });
+  }
+}
+
+// FIX #6 — persist is_urgent to DB so it survives page reloads
+async function setUrgent(req, res) {
+  try {
+    const { id } = req.params;
+    const { is_urgent } = req.body;
+
+    if (typeof is_urgent !== "boolean") {
+      return res.status(400).json({ message: "is_urgent must be a boolean" });
+    }
+
+    const project = await pool.query(
+      "SELECT client_id, assigned_developer_id, title FROM projects WHERE id = $1",
+      [id],
+    );
+
+    if (!project.rows.length) return res.status(404).json({ message: "Project not found" });
+    if (project.rows[0].client_id !== req.user.id) return res.status(403).json({ message: "Not your project" });
+
+    await pool.query("UPDATE projects SET is_urgent = $1 WHERE id = $2", [is_urgent, id]);
+
+    const proj = project.rows[0];
+
+    // Notify developer when flagged urgent
+    if (is_urgent && proj.assigned_developer_id) {
+      await createNotification({
+        io: req.io,
+        userId: Number(proj.assigned_developer_id),
+        type: "update_requested",
+        message: `🚨 "${proj.title}" has been marked as URGENT by the client. Please prioritise.`,
+        meta: { projectId: Number(id) },
+      });
+
+      // Record as a system event (not a revision)
+      const userRes = await pool.query(
+        "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
+        [req.user.id],
+      ).catch(() => ({ rows: [] }));
+      const u = userRes.rows[0];
+      const actorName = u ? `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username : "Unknown";
+
+      await pool.query(
+        `INSERT INTO project_events (project_id, actor_id, event_type, meta, actor_name, actor_role)
+         VALUES ($1, $2, 'project_urgent', $3, $4, $5)`,
+        [id, req.user.id, JSON.stringify({}), actorName, u?.role || "client"],
+      ).catch((e) => logger.error("project_events insert error", e));
+
+      req.io.to(`project_${id}`).emit("workspace_activity_updated", {
+        projectId: Number(id),
+        eventType: "project_urgent",
+      });
+    }
+
+    // BUG-M12 fix: emit project_unurgent event when urgency is removed so the
+    // activity timeline shows the change and the developer workspace updates.
+    if (!is_urgent) {
+      const userRes = await pool.query(
+        "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
+        [req.user.id],
+      ).catch(() => ({ rows: [] }));
+      const u = userRes.rows[0];
+      const actorName = u ? `${u.first_name || ""} ${u.last_name || ""}`.trim() || u.username : "Unknown";
+
+      await pool.query(
+        `INSERT INTO project_events (project_id, actor_id, event_type, meta, actor_name, actor_role)
+         VALUES ($1, $2, 'project_unurgent', $3, $4, $5)`,
+        [id, req.user.id, JSON.stringify({}), actorName, u?.role || "client"],
+      ).catch((e) => logger.error("project_events project_unurgent insert error", e));
+
+      req.io.to(`project_${id}`).emit("workspace_activity_updated", {
+        projectId: Number(id),
+        eventType: "project_unurgent",
+      });
+    }
+
+    res.json({ success: true, is_urgent });
+  } catch (err) {
+    logger.error("setUrgent error", err);
+    res.status(500).json({ message: "Error updating urgency flag" });
+  }
 }
 
 module.exports = {
@@ -358,4 +538,5 @@ module.exports = {
   completeProject,
   reviewProject,
   requestUpdate,
+  setUrgent,
 };

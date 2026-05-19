@@ -12,6 +12,7 @@ const uploadController       = require("../controllers/uploadController");
 const notificationController = require("../controllers/notificationController");
 const messageController      = require("../controllers/messageController");
 const statsController        = require("../controllers/statsController");
+const activityController     = require("../controllers/activityController");
 
 module.exports = function createRoutes(io) {
   const router = express.Router();
@@ -45,7 +46,9 @@ module.exports = function createRoutes(io) {
   router.get("/projects/assigned/:id",  authenticateUser, requireSelfParam("id"),     projectController.getAssignedProjects);
   router.put("/projects/:id/complete",  authenticateUser,                             projectController.completeProject);
   router.put("/projects/:id/review",    authenticateUser, validation.validateProjectReview, projectController.reviewProject);
-  router.post("/projects/:id/request-update", authenticateUser, validation.validateProjectReview, projectController.requestUpdate);
+  router.post("/projects/:id/request-update", authenticateUser, projectController.requestUpdate);
+  // FIX #6 — dedicated endpoint to persist is_urgent flag
+  router.patch("/projects/:id/urgent",  authenticateUser, projectController.setUrgent);
 
   // ── Bids ─────────────────────────────────────────────────────────────────────
   router.post("/projects/:id/bid",                    authenticateUser, validation.validateBid, bidController.placeBid);
@@ -81,6 +84,14 @@ module.exports = function createRoutes(io) {
   router.get("/api/stats/developer",        authenticateUser, statsController.getDeveloperStats);
   router.get("/api/activity/client",        authenticateUser, statsController.getClientActivity);
   router.get("/api/activity/developer",     authenticateUser, statsController.getDeveloperActivity);
+
+  // ── Workspace Activity Engine ─────────────────────────────────────────────────
+  router.get("/projects/:id/activity",                                    authenticateUser, activityController.getActivity);
+  router.post("/projects/:id/activity/:eventId/approve",                  authenticateUser, activityController.approveEntry);
+  router.post("/projects/:id/activity/:eventId/revision",                 authenticateUser, activityController.requestRevisionOnEntry);
+  router.post("/projects/:id/activity/:eventId/resolve",                  authenticateUser, activityController.resolveEntry);
+  router.get("/projects/:id/activity/:eventId/comments",                  authenticateUser, activityController.getComments);
+  router.post("/projects/:id/activity/:eventId/comments",                 authenticateUser, activityController.addComment);
 
   return router;
 };

@@ -1,5 +1,5 @@
 -- Production hardening baseline indexes/constraints for ai_marketplace.
--- Safe to run multiple times where IF NOT EXISTS is supported.
+-- Fully idempotent — safe to run multiple times.
 
 CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique_idx ON users (LOWER(username));
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users (LOWER(email));
@@ -19,8 +19,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_skills_user_skill_unique_idx ON user_skil
 CREATE INDEX IF NOT EXISTS project_files_project_id_position_idx ON project_files (project_id, position);
 CREATE INDEX IF NOT EXISTS project_submissions_project_id_submitted_at_idx ON project_submissions (project_id, submitted_at DESC);
 
-ALTER TABLE bids
-  ADD CONSTRAINT bids_amount_positive CHECK (amount > 0) NOT VALID;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'bids_amount_positive'
+  ) THEN
+    ALTER TABLE bids ADD CONSTRAINT bids_amount_positive CHECK (amount > 0) NOT VALID;
+  END IF;
+END $$;
 
-ALTER TABLE projects
-  ADD CONSTRAINT projects_budget_valid CHECK (min_budget IS NULL OR max_budget IS NULL OR min_budget <= max_budget) NOT VALID;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'projects_budget_valid'
+  ) THEN
+    ALTER TABLE projects ADD CONSTRAINT projects_budget_valid
+      CHECK (min_budget IS NULL OR max_budget IS NULL OR min_budget <= max_budget) NOT VALID;
+  END IF;
+END $$;
