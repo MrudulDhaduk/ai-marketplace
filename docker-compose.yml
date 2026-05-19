@@ -1,0 +1,107 @@
+version: "3.9"
+
+# ── AI Marketplace — local development stack ──────────────────────────────────
+#
+# Services:
+#   postgres  — PostgreSQL 16
+#   redis     — Redis 7 (Socket.IO adapter + rate limiting)
+#   backend   — Node.js API server (hot-reload via nodemon)
+#   frontend  — React dev server (CRA)
+#
+# Usage:
+#   docker compose up            # start all services
+#   docker compose up backend    # start only backend + its deps
+#   docker compose down -v       # stop and remove volumes
+
+services:
+
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-ai_marketplace}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-ai_marketplace}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend (development) ────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      target: production   # use the production stage image
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379
+      REDIS_ENABLED: "true"
+    ports:
+      - "${PORT:-5000}:5000"
+    volumes:
+      # Mount source for live reload in dev (override CMD below)
+      - ./backend:/app/backend:ro
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["node", "backend/server.js"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+  # ── Frontend (development) ───────────────────────────────────────────────────
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    restart: unless-stopped
+    env_file:
+      - frontend/.env
+    environment:
+      REACT_APP_API_URL: http://localhost:${PORT:-5000}
+      REACT_APP_SOCKET_URL: http://localhost:${PORT:-5000}
+      CHOKIDAR_USEPOLLING: "true"   # required for file watching inside Docker
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app:delegated
+      - /app/node_modules          # anonymous volume prevents host node_modules override
+    depends_on:
+      - backend
+    command: ["npm", "start"]
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:

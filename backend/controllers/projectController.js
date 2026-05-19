@@ -12,8 +12,40 @@ function getPagination(query) {
   return { page, limit, offset: (page - 1) * limit };
 }
 
-function healthCheck(_req, res) {
-  res.json({ status: "ok", ts: new Date().toISOString() });
+/** GET /health — real liveness + readiness probe */
+async function healthCheck(_req, res) {
+  const start = Date.now();
+  let dbOk = false;
+  let dbLatencyMs = null;
+
+  try {
+    const dbStart = Date.now();
+    await pool.query("SELECT 1");
+    dbLatencyMs = Date.now() - dbStart;
+    dbOk = true;
+  } catch (err) {
+    logger.error("Health check DB ping failed", err);
+  }
+
+  const status = dbOk ? "ok" : "degraded";
+  const httpStatus = dbOk ? 200 : 503;
+
+  res.status(httpStatus).json({
+    status,
+    ts: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    env: process.env.NODE_ENV || "development",
+    db: {
+      ok: dbOk,
+      latencyMs: dbLatencyMs,
+      pool: {
+        total: pool.totalCount,
+        idle: pool.idleCount,
+        waiting: pool.waitingCount,
+      },
+    },
+    responseMs: Date.now() - start,
+  });
 }
 
 /** POST /api/projects */

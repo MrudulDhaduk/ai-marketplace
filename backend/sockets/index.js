@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const config = require("../config/env");
 const pool = require("../config/db");
 const logger = require("../utils/logger");
+const { captureSocketError } = require("../config/sentry");
 
 function setupSockets(io) {
   // ── Auth middleware ──────────────────────────────────────────────────────────
@@ -24,8 +25,19 @@ function setupSockets(io) {
   });
 
   io.on("connection", (socket) => {
+    logger.debug("socket connected", { socketId: socket.id, userId: socket.user.id });
+
     // Always join personal room for targeted notifications
     socket.join(`user_${socket.user.id}`);
+
+    socket.on("disconnect", (reason) => {
+      logger.debug("socket disconnected", { socketId: socket.id, userId: socket.user.id, reason });
+    });
+
+    socket.on("error", (err) => {
+      logger.error("socket error", err);
+      captureSocketError(err, { socketId: socket.id, userId: socket.user?.id });
+    });
 
     // ── register (legacy support) ──────────────────────────────────────────────
     socket.on("register", (userId) => {

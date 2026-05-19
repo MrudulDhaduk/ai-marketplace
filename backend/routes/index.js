@@ -68,6 +68,7 @@ module.exports = function createRoutes(io) {
   router.get("/projects/:id/files",    authenticateUser,                uploadController.getProjectFiles);
   router.delete("/files/:id",          authenticateUser,                uploadController.deleteFile);
   router.put("/files/reorder",         authenticateUser, validation.validateFileReorder, uploadController.reorderFiles);
+  router.get("/files/:id/url",         authenticateUser,                uploadController.getFileUrl);
 
   // ── Notifications ─────────────────────────────────────────────────────────────
   router.get("/notifications",              authenticateUser, notificationController.getNotifications);

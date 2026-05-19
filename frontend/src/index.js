@@ -1,3 +1,6 @@
+// Sentry must be initialised before React renders
+import "./sentry";
+
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";

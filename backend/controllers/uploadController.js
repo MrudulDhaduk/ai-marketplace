@@ -1,7 +1,7 @@
 const multer = require("multer");
-const fs = require("fs/promises");
 const pool = require("../config/db");
-const { upload, safeUploadPath } = require("../services/uploadService");
+const { upload } = require("../services/uploadService");
+const storageService = require("../services/storageService");
 const logger = require("../utils/logger");
 
 /** POST /projects/:id/upload */
@@ -34,7 +34,8 @@ function uploadFiles(req, res) {
       const cleanup = async () => {
         for (const file of filesFromPayload) {
           try {
-            await fs.unlink(safeUploadPath(file.filename));
+            // file.key is set by multer-s3; file.filename is set by multer disk storage
+            await storageService.deleteFile(file.key || file.filename);
           } catch (e) {
             if (e.code !== "ENOENT") logger.error("Cleanup error", e);
           }
@@ -63,6 +64,8 @@ function uploadFiles(req, res) {
         const insertedRows = [];
 
         for (const file of filesFromPayload) {
+          // multer-s3 sets file.key; multer disk storage sets file.filename
+          const storedName = file.key || file.filename;
           const inserted = await pool.query(
             `INSERT INTO project_files (project_id, file_name, size, uploaded_at, position)
              VALUES (
@@ -70,7 +73,7 @@ function uploadFiles(req, res) {
                (SELECT COALESCE(MAX(position), 0) + 1 FROM project_files WHERE project_id = $1)
              )
              RETURNING *`,
-            [id, file.filename, file.size || null],
+            [id, storedName, file.size || null],
           );
           insertedRows.push(inserted.rows[0]);
         }
@@ -171,10 +174,8 @@ async function deleteFile(req, res) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    const filePath = safeUploadPath(file_name);
-
     try {
-      await fs.unlink(filePath);
+      await storageService.deleteFile(file_name);
     } catch (unlinkError) {
       if (unlinkError.code !== "ENOENT") throw unlinkError;
     }
@@ -280,4 +281,37 @@ async function reorderFiles(req, res) {
   }
 }
 
-module.exports = { uploadFiles, getProjectFiles, deleteFile, reorderFiles };
+module.exports = { uploadFiles, getProjectFiles, deleteFile, reorderFiles, getFileUrl };
+
+/** GET /files/:id/url — returns a (signed) URL for a single file */
+async function getFileUrl(req, res) {
+  try {
+    const { id } = req.params;
+    const ttl = Number(req.query.ttl) || 3600; // seconds
+
+    const fileResult = await pool.query(
+      `SELECT pf.file_name, pf.project_id, p.client_id, p.assigned_developer_id
+       FROM project_files pf
+       INNER JOIN projects p ON p.id = pf.project_id
+       WHERE pf.id = $1`,
+      [id],
+    );
+
+    if (!fileResult.rows.length) return res.status(404).json({ message: "File not found" });
+
+    const { file_name, project_id, client_id, assigned_developer_id } = fileResult.rows[0];
+
+    if (
+      Number(client_id) !== Number(req.user.id) &&
+      Number(assigned_developer_id || 0) !== Number(req.user.id)
+    ) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    const url = await storageService.getSignedUrl(file_name, ttl);
+    res.json({ url, expiresIn: ttl });
+  } catch (err) {
+    logger.error("getFileUrl error", err);
+    res.status(500).json({ message: "Failed to generate file URL" });
+  }
+}
