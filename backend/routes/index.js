@@ -1,5 +1,5 @@
 const express = require("express");
-const { authenticateUser, requireSelfParam, optionalAuth } = require("../middleware/auth");
+const { authenticateUser, requireRole, requireSelfParam, optionalAuth } = require("../middleware/auth");
 const { authLimiter, uploadLimiter, resendLimiter, doubleCsrfProtection, generateCsrfToken } = require("../middleware/security");
 const validation = require("../middleware/validation");
 const { idempotency } = require("../middleware/idempotency");
@@ -57,9 +57,9 @@ module.exports = function createRoutes(io) {
   router.delete("/profile/:id/skills", authenticateUser, requireSelfParam("id"), doubleCsrfProtection, validation.validateSkill, profileController.removeSkill);
 
   // ── Projects ─────────────────────────────────────────────────────────────────
-  router.post("/api/projects",          authenticateUser, doubleCsrfProtection, validation.validateProject, projectController.createProject);
-  router.get("/api/projects",           authenticateUser,                                                   projectController.getClientProjects);
-  router.get("/api/projects/:id",       authenticateUser,                                                   projectController.getProject);
+  router.post("/api/projects",          authenticateUser, requireRole("client"), doubleCsrfProtection, validation.validateProject, projectController.createProject);
+  router.get("/api/projects",           authenticateUser, requireRole("client"),                                                   projectController.getClientProjects);
+  router.get("/api/projects/:id",       authenticateUser,                                                                          projectController.getProject);
   router.get("/projects",                                                                                    projectController.listPublicProjects);
   router.get("/projects/discover/:id",  authenticateUser, requireSelfParam("id"),                           projectController.discoverProjects);
   router.get("/projects/assigned/:id",  authenticateUser, requireSelfParam("id"),                           projectController.getAssignedProjects);
@@ -102,10 +102,10 @@ module.exports = function createRoutes(io) {
   router.get("/api/messages/unread-count",  authenticateUser, messageController.getUnreadCount);
 
   // ── Stats & Activity ──────────────────────────────────────────────────────────
-  router.get("/api/stats/client",           authenticateUser, statsController.getClientStats);
-  router.get("/api/stats/developer",        authenticateUser, statsController.getDeveloperStats);
-  router.get("/api/activity/client",        authenticateUser, statsController.getClientActivity);
-  router.get("/api/activity/developer",     authenticateUser, statsController.getDeveloperActivity);
+  router.get("/api/stats/client",       authenticateUser, requireRole("client"),    statsController.getClientStats);
+  router.get("/api/stats/developer",    authenticateUser, requireRole("developer"), statsController.getDeveloperStats);
+  router.get("/api/activity/client",    authenticateUser, requireRole("client"),    statsController.getClientActivity);
+  router.get("/api/activity/developer", authenticateUser, requireRole("developer"), statsController.getDeveloperActivity);
 
   // ── Workspace Activity Engine ─────────────────────────────────────────────────
   router.get("/projects/:id/activity",                                    authenticateUser, activityController.getActivity);

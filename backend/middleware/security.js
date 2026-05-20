@@ -29,9 +29,20 @@ function makeStore(prefix) {
   return undefined;
 }
 
-const apiLimiter    = rateLimit({ windowMs: 15 * 60 * 1000, max: 500, standardHeaders: true, legacyHeaders: false, store: makeStore("api") });
-const authLimiter   = rateLimit({ windowMs: 15 * 60 * 1000, max: 25,  standardHeaders: true, legacyHeaders: false, store: makeStore("auth") });
-const uploadLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60,  standardHeaders: true, legacyHeaders: false, store: makeStore("upload") });
+// ── Rate limit bypass for automated testing ──────────────────────────────────
+// When X-Test-Bypass header matches TEST_API_KEY env var, skip all rate limits.
+// TEST_API_KEY must be set in .env — if absent, bypass is disabled entirely.
+// Never expose this header in production (TEST_API_KEY should not be set there).
+const TEST_API_KEY = process.env.TEST_API_KEY || null;
+
+function skipInTestMode(req) {
+  if (!TEST_API_KEY) return false;
+  return req.headers["x-test-bypass"] === TEST_API_KEY;
+}
+
+const apiLimiter    = rateLimit({ windowMs: 15 * 60 * 1000, max: 500, standardHeaders: true, legacyHeaders: false, store: makeStore("api"),    skip: skipInTestMode });
+const authLimiter   = rateLimit({ windowMs: 15 * 60 * 1000, max: 25,  standardHeaders: true, legacyHeaders: false, store: makeStore("auth"),   skip: skipInTestMode });
+const uploadLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 60,  standardHeaders: true, legacyHeaders: false, store: makeStore("upload"), skip: skipInTestMode });
 
 // ── Per-email resend rate limiter ─────────────────────────────────────────────
 // The IP-based authLimiter alone doesn't stop an attacker cycling IPs from
@@ -48,23 +59,25 @@ const resendLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   store: makeStore("resend"),
+  // Skip all limits in test mode
+  skip: skipInTestMode,
   // Key by the normalised email from the body, fall back to IP
+  // ipKeyGenerator helper is required by express-rate-limit v8 for IPv6 safety
   keyGenerator(req) {
     const email = req.body?.email;
     if (email && typeof email === "string") {
       return `email:${email.trim().toLowerCase()}`;
     }
-    return req.ip;
+    // Normalise IPv6 ::ffff:x.x.x.x to plain IPv4 to avoid bypass via address format
+    const ip = (req.ip || "").replace(/^::ffff:/, "");
+    return `ip:${ip}`;
   },
-  // Always return 200 to prevent email enumeration — the controller handles
-  // the actual response. We skip the rate-limit error response entirely.
-  skip: () => false,
+  // Always return 200 to prevent email enumeration
   handler(req, res) {
     logger.warn("Resend verification rate limit hit", {
       email: req.body?.email ? req.body.email.trim().toLowerCase() : "unknown",
       ip: req.ip,
     });
-    // Return the same ambiguous message the controller uses — no enumeration
     res.status(200).json({ message: "If that email exists and is unverified, a new link has been sent." });
   },
 });
@@ -84,9 +97,15 @@ const resendLimiter = rateLimit({
 // IMPORTANT: CSRF protection is only needed because we switched to httpOnly
 // cookies. The previous Bearer-header flow was inherently CSRF-safe.
 const CSRF_SECRET = process.env.CSRF_SECRET || config.jwt.secret;
+const { AUTH_COOKIE } = require("../config/constants");
 
 const { generateCsrfToken, doubleCsrfProtection } = doubleCsrf({
   getSecret: () => CSRF_SECRET,
+  // Tie the CSRF token to the auth session cookie so tokens can't be
+  // reused across different users or after logout.
+  // For unauthenticated requests (login/signup are CSRF-exempt) this
+  // returns an empty string — that's fine because those routes skip CSRF.
+  getSessionIdentifier: (req) => req.cookies?.[AUTH_COOKIE] ?? "",
   cookieName: "x-csrf-token",
   cookieOptions: {
     httpOnly: false,   // must be readable by JS to send back in header

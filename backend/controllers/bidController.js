@@ -43,6 +43,11 @@ async function placeBid(req, res) {
 
     const project = projectRes.rows[0];
 
+    // A client cannot bid on their own project
+    if (Number(project.client_id) === Number(developerId)) {
+      return res.status(403).json({ message: "You cannot bid on your own project" });
+    }
+
     if (project.assigned_developer_id) {
       return res.status(400).json({ message: "Project already assigned" });
     }
@@ -167,16 +172,9 @@ async function acceptBid(req, res) {
       return res.status(403).json({ error: "Unauthorized" });
     }
 
-    if (proj.assigned_developer_id) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({ error: "Project already assigned" });
-    }
-
-    if (proj.status !== "bidding") {
-      await client.query("ROLLBACK");
-      return res.status(400).json({ error: "Project not open for assignment" });
-    }
-
+    // Fetch the bid early so we can do an idempotency check before the
+    // project-state guards (which would otherwise return 400 on a replay
+    // because the project is already 'active').
     const bidResult = await client.query(
       "SELECT id, developer_id, amount, status FROM bids WHERE id = $1 AND project_id = $2",
       [bidId, projectId],
@@ -188,15 +186,26 @@ async function acceptBid(req, res) {
       return res.status(404).json({ error: "Bid not found" });
     }
 
+    // Idempotency: if this bid was already accepted, return success immediately
+    // without re-running the state-mutation logic.
     if (bid.status === "accepted") {
       await client.query("ROLLBACK");
-      // Idempotent: already accepted — return success instead of erroring
       return res.json({
         message: "Bid accepted successfully",
         assignedDeveloperId: bid.developer_id,
         projectId,
         idempotent: true,
       });
+    }
+
+    if (proj.assigned_developer_id) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Project already assigned" });
+    }
+
+    if (proj.status !== "bidding") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Project not open for assignment" });
     }
 
     await client.query(

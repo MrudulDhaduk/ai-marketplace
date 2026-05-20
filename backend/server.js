@@ -62,6 +62,10 @@ app.use(sentryErrorHandler);
 // 2. App sends the HTTP response
 app.use((err, req, res, next) => {
   if (err.message === "Not allowed by CORS") return res.status(403).json({ message: "CORS origin denied" });
+  // csrf-csrf throws ForbiddenError for invalid/missing CSRF tokens
+  if (err.code === "EBADCSRFTOKEN" || err.constructor?.name === "ForbiddenError" || err.message === "invalid csrf token") {
+    return res.status(403).json({ code: "INVALID_CSRF_TOKEN", message: "Invalid or missing CSRF token" });
+  }
   logger.error("Unhandled request error", err);
   res.status(500).json({ message: "Internal server error" });
 });
