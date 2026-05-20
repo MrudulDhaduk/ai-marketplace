@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useFadeUp } from '../hooks/useFadeup';
-import { API_BASE_URL } from '../lib/api';
-
-const API_URL = `${API_BASE_URL}/projects`;
+import { apiRequest } from '../lib/api';
 
 /* ── Project detail modal ─────────────────────────── */
 function ProjectModal({ project, onClose }) {
@@ -169,7 +167,9 @@ function Projects() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(`${API_URL}?limit=6`);
+        // Use apiRequest instead of raw fetch — gets proper auth headers
+        // and consistent 401 handling via the centralized api layer
+        const res = await apiRequest(`/projects?limit=6`);
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         const data = await res.json();
         setProjects(Array.isArray(data) ? data : (data.data || []));

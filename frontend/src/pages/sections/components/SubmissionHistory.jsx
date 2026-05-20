@@ -11,14 +11,21 @@
  *   • Filter bar (All / Submissions / Files / Reviews / System)
  *   • Realtime updates via socket
  */
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { socket } from "../../../socket";
+import { useState, useRef, useCallback, useMemo } from "react";
+import { useSocket } from "../../../context/SocketContext";
 import "../ProjectWorkspace.css";
 import "./SubmissionHistory.css";
-import React from "react";
+import React, { useEffect } from "react";
 import { apiRequest } from "../../../lib/api";
 import TimelineEventCard from "./TimelineEventCard";
 import TimelineFilters from "./TimelineFilters";
+import {
+  useProjectActivity,
+  useProjectSubmissions,
+  invalidateProjectActivity,
+} from "../../../hooks/useProjectQueries";
+import { queryClient } from "../../../lib/queryClient";
+import { queryKeys } from "../../../lib/queryKeys";
 
 /* ─── icons ─────────────────────────────────────────────────────────────────── */
 function IEdit() {
@@ -237,62 +244,40 @@ function EmptyState({ filter }) {
 
 /* ─── main component ─────────────────────────────────────────────────────────── */
 export default React.memo(function SubmissionHistory({ projectId, token, isClient = false }) {
-  /* ── manual notes state (preserved) ── */
-  const [history,    setHistory]    = useState([]);
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState("");
+  const socket = useSocket();
+
+  /* ── manual notes UI state (preserved) ── */
   const [editingId,  setEditingId]  = useState(null);
   const [editData,   setEditData]   = useState({});
   const [newNote,    setNewNote]    = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  /* ── activity feed state (new) ── */
-  const [activity,        setActivity]        = useState([]);
-  const [activityLoading, setActivityLoading] = useState(false);
-  const [activeFilter,    setActiveFilter]    = useState("all");
-  const [activeTab,       setActiveTab]       = useState("activity"); // "activity" | "notes"
+  /* ── filter + tab state ── */
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [activeTab,    setActiveTab]    = useState("activity");
 
   const timelineRef = useRef(null);
 
-  /* ── fetch manual notes (preserved) ── */
-  const fetchHistory = useCallback(async () => {
-    if (!projectId) return;
-    setLoading(true);
-    setError("");
-    try {
-      const res = await apiRequest(`/projects/${projectId}/submissions`);
-      if (!res.ok) { setError("Failed to load submission history"); return; }
-      const data = await res.json();
-      const sorted = Array.isArray(data)
-        ? [...data].sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))
-        : [];
-      setHistory(sorted);
-    } catch {
-      setError("Failed to load submission history");
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId]);
+  /* ── Server state via TanStack Query ── */
+  const {
+    data: history = [],
+    isLoading: loading,
+    error: historyError,
+    refetch: refetchHistory,
+  } = useProjectSubmissions(projectId);
 
-  /* ── fetch activity feed (new) ── */
-  const fetchActivity = useCallback(async () => {
-    if (!projectId) return;
-    setActivityLoading(true);
-    try {
-      const res = await apiRequest(`/projects/${projectId}/activity?filter=${activeFilter}&limit=60`);
-      if (res.ok) {
-        const data = await res.json();
-        setActivity(Array.isArray(data.data) ? data.data : []);
-      }
-    } catch { /* silent — activity feed is non-critical */ }
-    finally { setActivityLoading(false); }
-  }, [projectId, activeFilter]);
+  const {
+    data: activity = [],
+    isLoading: activityLoading,
+  } = useProjectActivity(projectId, activeFilter);
+
+  const error = historyError ? "Failed to load submission history" : "";
 
   /* ── manual note CRUD (preserved) ── */
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this update?")) return;
     await apiRequest(`/projects/${projectId}/submissions/${id}`, { method: "DELETE" });
-    fetchHistory();
+    refetchHistory();
   };
 
   const handleUpdate = async (id) => {
@@ -303,7 +288,7 @@ export default React.memo(function SubmissionHistory({ projectId, token, isClien
     });
     setEditingId(null);
     setEditData({});
-    fetchHistory();
+    refetchHistory();
   };
 
   const handleEditStart  = (item) => { setEditingId(item.id); setEditData({ notes: item.notes ?? "" }); };
@@ -318,7 +303,7 @@ export default React.memo(function SubmissionHistory({ projectId, token, isClien
         body: JSON.stringify({ notes: newNote }),
       });
       setNewNote("");
-      fetchHistory();
+      refetchHistory();
     } catch {
       alert("Failed to add update");
     } finally {
@@ -328,62 +313,57 @@ export default React.memo(function SubmissionHistory({ projectId, token, isClien
 
   /* ── activity entry updated callback ── */
   const handleEntryUpdated = useCallback((eventId, newStatus) => {
-    setActivity((prev) =>
-      prev.map((e) => e.id === eventId ? { ...e, approval_status: newStatus } : e),
+    // Optimistically update the activity cache entry
+    queryClient.setQueryData(
+      queryKeys.projects.activity(projectId, activeFilter),
+      (prev = []) =>
+        prev.map((e) => e.id === eventId ? { ...e, approval_status: newStatus } : e),
     );
-  }, []);
+  }, [projectId, activeFilter]);
 
-  /* ── effects ── */
-  useEffect(() => {
-    if (!projectId) return;
-    fetchHistory();
-    fetchActivity();
-  }, [projectId, fetchHistory, fetchActivity]);
-
-  useEffect(() => {
-    if (!projectId) return;
-    fetchActivity();
-  }, [activeFilter, fetchActivity]);
-
+  /* ── socket → query invalidation ── */
   useEffect(() => {
     if (!projectId) return;
 
     const handleHistoryUpdated = () => {
-      fetchHistory();
-      fetchActivity();
+      refetchHistory();
+      invalidateProjectActivity(projectId);
     };
-    const handleActivityUpdated = () => fetchActivity();
-    const handleCommentAdded = ({ eventId, comment }) => {
-      setActivity((prev) =>
-        prev.map((e) =>
-          e.id === eventId
-            ? { ...e, comment_count: (e.comment_count || 0) + 1 }
-            : e,
-        ),
+    const handleActivityUpdated = () => {
+      invalidateProjectActivity(projectId);
+    };
+    const handleCommentAdded = ({ eventId }) => {
+      // Optimistically bump comment count in cache
+      queryClient.setQueryData(
+        queryKeys.projects.activity(projectId, activeFilter),
+        (prev = []) =>
+          prev.map((e) =>
+            e.id === eventId
+              ? { ...e, comment_count: (e.comment_count || 0) + 1 }
+              : e,
+          ),
       );
     };
     const handleEntryUpdatedSocket = ({ eventId, approval_status, approval_feedback, actioned_at }) => {
-      setActivity((prev) =>
-        prev.map((e) =>
-          e.id === eventId
-            ? {
-                ...e,
-                approval_status,
-                approval_feedback: approval_feedback ?? e.approval_feedback,
-                // BUG-C9 fix: update actioned_at in local state so the
-                // timeline card shows the correct resolution timestamp
-                // without requiring a full refetch
-                actioned_at: actioned_at ?? e.actioned_at,
-              }
-            : e,
-        ),
-      );
+      // Update all activity filter variants in cache
+      ["all", "submissions", "files", "reviews", "system"].forEach((filter) => {
+        queryClient.setQueryData(
+          queryKeys.projects.activity(projectId, filter),
+          (prev = []) =>
+            prev.map((e) =>
+              e.id === eventId
+                ? {
+                    ...e,
+                    approval_status,
+                    approval_feedback: approval_feedback ?? e.approval_feedback,
+                    actioned_at: actioned_at ?? e.actioned_at,
+                  }
+                : e,
+            ),
+        );
+      });
     };
 
-    // BUG-M1 fix: always pass the handler reference to socket.off so we only
-    // remove THIS component's listener, not every listener for the event name.
-    // The old bare socket.off("event") call was a global removal that would
-    // silently kill listeners registered by any other mounted instance.
     socket.on("submission_history_updated", handleHistoryUpdated);
     socket.on("workspace_activity_updated", handleActivityUpdated);
     socket.on("activity_comment_added",     handleCommentAdded);
@@ -395,7 +375,7 @@ export default React.memo(function SubmissionHistory({ projectId, token, isClien
       socket.off("activity_comment_added",     handleCommentAdded);
       socket.off("activity_entry_updated",     handleEntryUpdatedSocket);
     };
-  }, [projectId, fetchHistory, fetchActivity]);
+  }, [projectId, socket, activeFilter, refetchHistory]);
 
   /* ── group activity by date ── */
   const groupedActivity = useMemo(() => {

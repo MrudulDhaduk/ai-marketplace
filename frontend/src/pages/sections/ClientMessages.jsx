@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../../lib/api";
-import { socket } from "../../socket";
+import { useSocket } from "../../context/SocketContext";
 import { useAuth } from "../../context/AuthContext";
+import { useClientProjects } from "../../hooks/useProjectQueries";
 
 /* ── helpers ─────────────────────────────────────── */
 function timeAgo(dateStr) {
@@ -43,6 +44,7 @@ function ProjectPicker({ projects, selected, onSelect }) {
 
 /* ── chat panel ──────────────────────────────────── */
 function ChatPanel({ project, currentUser }) {
+  const socket = useSocket();
   const [messages, setMessages] = useState([]);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -51,23 +53,17 @@ function ChatPanel({ project, currentUser }) {
   const bottomRef = useRef(null);
   const typingTimer = useRef(null);
 
-  /* fetch messages */
-  const fetchMessages = useCallback(async () => {
+  /* fetch messages on project change */
+  useEffect(() => {
     if (!project?.id) return;
-    try {
-      const r = await apiRequest(`/projects/${project.id}/messages`);
-      if (!r.ok) return;
-      const data = await r.json();
-      setMessages(data.data ?? []);
-    } catch {}
+    setMessages([]);
+    apiRequest(`/projects/${project.id}/messages`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data) setMessages(data.data ?? []); })
+      .catch(() => {});
   }, [project?.id]);
 
-  useEffect(() => {
-    setMessages([]);
-    fetchMessages();
-  }, [fetchMessages]);
-
-  /* join socket room + listeners */
+  /* join socket room + realtime listeners */
   useEffect(() => {
     if (!project?.id) return;
     socket.emit("join_project", project.id);
@@ -86,12 +82,12 @@ function ChatPanel({ project, currentUser }) {
     };
 
     socket.on("new_message", handleNewMessage);
-    socket.on("typing", handleTyping);
+    socket.on("typing",      handleTyping);
     return () => {
       socket.off("new_message", handleNewMessage);
-      socket.off("typing", handleTyping);
+      socket.off("typing",      handleTyping);
     };
-  }, [project?.id, currentUser?.id]);
+  }, [project?.id, currentUser?.id, socket]);
 
   /* scroll to bottom on new messages */
   useEffect(() => {
@@ -192,28 +188,24 @@ function ChatPanel({ project, currentUser }) {
 /* ── main component ──────────────────────────────── */
 export default function ClientMessages({ initialProjectId }) {
   const { currentUser } = useAuth();
-  const [projects, setProjects] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [loading, setLoading] = useState(true);
 
+  // Reuse the shared projects query — no duplicate fetch
+  const { data: rawProjects = [], isLoading: loading } = useClientProjects();
+  // Only show projects that have an assigned developer (can message)
+  const projects = rawProjects.filter((p) => p.assigned_developer_id);
+
+  // Auto-select on load / when initialProjectId changes
   useEffect(() => {
-    apiRequest("/api/projects?limit=50")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        // Only show projects that have an assigned developer (can message)
-        const rows = (data?.data ?? []).filter((p) => p.assigned_developer_id);
-        setProjects(rows);
-        // Auto-select initialProjectId if provided, else first project
-        if (initialProjectId) {
-          const target = rows.find((p) => p.id === initialProjectId);
-          setSelected(target || rows[0] || null);
-        } else if (rows.length > 0) {
-          setSelected(rows[0]);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [initialProjectId]);
+    if (projects.length === 0) return;
+    if (initialProjectId) {
+      const target = projects.find((p) => p.id === initialProjectId);
+      setSelected(target || projects[0] || null);
+    } else if (!selected) {
+      setSelected(projects[0]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects.length, initialProjectId]);
 
   if (loading) {
     return (

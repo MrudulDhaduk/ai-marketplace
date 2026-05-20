@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./TopBar.css";
-import { socket } from "../socket";
+import { useSocket } from "../context/SocketContext";
 import { useAuth } from "../context/AuthContext";
 import { apiRequest } from "../lib/api";
+import { useNotifications } from "../hooks/useProjectQueries";
+import { queryClient } from "../lib/queryClient";
+import { queryKeys } from "../lib/queryKeys";
 
 /* ═══════════════════════════════════════
    ICONS
@@ -70,86 +73,56 @@ export default function TopBar({
 }) {
   const navigate = useNavigate();
   const { currentUser: user, logout } = useAuth();
+  const socket = useSocket();
   const [dropOpen, setDropOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchFocused, setFocused] = useState(false);
   const dropRef = useRef(null);
   const notifRef = useRef(null);
   const searchRef = useRef(null);
 
+  // Use TanStack Query for notifications — replaces manual fetch + socket refetch
+  const { data: notifications = [] } = useNotifications(user?.id);
+  // Local optimistic state for read status (avoids full refetch on mark-read)
+  const [localNotifs, setLocalNotifs] = useState(null);
+  const displayNotifs = localNotifs ?? notifications;
+
+  // Sync local state when query data changes (e.g. after invalidation)
+  useEffect(() => {
+    setLocalNotifs(null);
+  }, [notifications]);
+
   const initial = user?.username?.[0]?.toUpperCase() || "U";
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
-
-  /* ── Load persisted notifications on mount ── */
-  const fetchNotifications = useCallback(() => {
-    if (!user?.id) return;
-    apiRequest("/notifications?limit=20")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (data?.data) setNotifications(data.data);
-      })
-      .catch(() => {});
-  }, [user?.id]);
-
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
-
-  /* ── Register socket room ── */
-  // Emit "register" both immediately (if already connected) and on every
-  // (re)connect so the personal room is always joined even after a
-  // reconnect or a page-refresh where the socket connects slightly after
-  // this effect runs.
-  // Also re-fetch notifications on reconnect to recover any events that
-  // were emitted while the socket was disconnected.
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const onConnect = () => {
-      socket.emit("register", user.id);
-      // Re-fetch to pick up any notifications persisted while disconnected
-      fetchNotifications();
-    };
-
-    // If already connected, register right away
-    if (socket.connected) {
-      socket.emit("register", user.id);
-    }
-
-    socket.on("connect", onConnect);
-    return () => {
-      socket.off("connect", onConnect);
-    };
-  }, [user?.id, fetchNotifications]);
+  const unreadCount = displayNotifs.filter((n) => !n.is_read).length;
 
   /* ── Real-time notification listener ── */
   useEffect(() => {
     if (!user) return;
 
-    // Single handler for all persisted notifications from the server.
-    // The backend always emits "notification" with the real DB row (including
-    // a valid integer id), so we never need fake ids here.
-    // The legacy role-specific "new_bid" / "bid_accepted" socket events are
-    // intentionally NOT listened to here — they would create duplicate
-    // notifications with fake Date.now() ids that cause 404s when the user
-    // tries to mark them as read.
+    // New notification arrives → prepend optimistically + invalidate cache
     const handleNotification = (notif) => {
-      setNotifications((prev) => {
-        // Deduplicate: ignore if we already have this notification id
-        if (prev.some((n) => n.id === notif.id)) return prev;
-        return [notif, ...prev];
+      setLocalNotifs((prev) => {
+        const base = prev ?? notifications;
+        if (base.some((n) => n.id === notif.id)) return base;
+        return [notif, ...base];
       });
+      // Also invalidate so the query cache stays in sync
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
+    };
+
+    // On reconnect, invalidate to pick up any missed notifications
+    const onConnect = () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
     };
 
     socket.on("notification", handleNotification);
+    socket.on("connect",      onConnect);
 
     return () => {
       socket.off("notification", handleNotification);
+      socket.off("connect",      onConnect);
     };
-  }, [user]);
-
-  /* ── Close dropdowns on outside click ── */
+  }, [user, notifications, socket]);
   useEffect(() => {
     if (!dropOpen && !notifOpen) return;
     const handler = (e) => {
@@ -172,21 +145,25 @@ export default function TopBar({
   /* ── Mark single notification as read ── */
   const handleMarkRead = useCallback(async (notif) => {
     if (notif.is_read) return;
-    setNotifications((prev) =>
-      prev.map((n) => n.id === notif.id ? { ...n, is_read: true } : n),
+    // Optimistic update
+    setLocalNotifs((prev) =>
+      (prev ?? notifications).map((n) => n.id === notif.id ? { ...n, is_read: true } : n),
     );
     try {
       await apiRequest(`/notifications/${notif.id}/read`, { method: "PUT" });
     } catch {}
-  }, []);
+  }, [notifications]);
 
   /* ── Mark all as read ── */
   const handleMarkAllRead = useCallback(async () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    // Optimistic update
+    setLocalNotifs((prev) =>
+      (prev ?? notifications).map((n) => ({ ...n, is_read: true })),
+    );
     try {
       await apiRequest("/notifications/read-all", { method: "PUT" });
     } catch {}
-  }, []);
+  }, [notifications]);
 
   const handleLogout = useCallback(() => {
     logout();
@@ -263,11 +240,11 @@ export default function TopBar({
                   </button>
                 )}
               </div>
-              {notifications.length === 0 ? (
+              {displayNotifs.length === 0 ? (
                 <p className="notif-empty">No notifications yet</p>
               ) : (
                 <ul className="notif-list">
-                  {notifications.slice(0, 20).map((n, i) => (
+                  {displayNotifs.slice(0, 20).map((n, i) => (
                     <li
                       key={n.id ?? i}
                       className={`notif-item${n.is_read ? "" : " notif-item--unread"}`}

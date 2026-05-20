@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback } from "react";
 import "./DeveloperDashboard.css";
 import TopBar from "../../components/TopBar";
 import DevSidebar from "../../components/DevSideBar";
@@ -12,8 +12,16 @@ import DeveloperRatings from "../sections/DeveloperRatings";
 import DeveloperSettings from "../sections/DeveloperSettings";
 import { useMousePos, useRipple } from "../hooks";
 import React from "react";
-import { apiRequest } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
+import {
+  useProjectFeed,
+  useAssignedProjects,
+  useDeveloperBids,
+} from "../../hooks/useProjectQueries";
+import { queryClient } from "../../lib/queryClient";
+import { queryKeys } from "../../lib/queryKeys";
+import ErrorBoundary from "../../components/ErrorBoundary";
+import "../../components/ErrorBoundary.css";
 
 
 const MemoBackground = React.memo(Background);
@@ -21,8 +29,6 @@ const MemoBackground = React.memo(Background);
 export default function DeveloperDashboard() {
   const { currentUser: user } = useAuth();
 
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [budget, setBudget] = useState("all");
   const [tags, setTags] = useState([]);
@@ -31,100 +37,40 @@ export default function DeveloperDashboard() {
   const [showAll, setShowAll] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [filteredCount, setFilteredCount] = useState(0);
-  const [assignedProjects, setAssignedProjects] = useState([]);
-  const [myBids, setMyBids] = useState([]);
   const [bidsView, setBidsView] = useState("list");
   const [activeProject, setActiveProject] = useState(null);
-  // For "Message Developer" deep-link from workspace
   const [messageProjectId, setMessageProjectId] = useState(null);
   const mousePos = useMousePos();
   const shellRef = useRef(null);
+
+  // Replace 3 manual useEffect fetches with TanStack Query hooks
+  const { data: projects = [], isLoading: loading } = useProjectFeed(user?.id, showAll);
+  const { data: assignedProjects = [] } = useAssignedProjects(user?.id);
+  const { data: myBids = [] } = useDeveloperBids(user?.id);
 
   const allTags = [...new Set(projects.flatMap((p) => Array.isArray(p.tags) ? p.tags : []))].sort();
 
   useRipple(shellRef);
 
-  // projects feed fetch
-  useEffect(() => {
-    if (!user?.id) return;
-    const fetchProjects = async () => {
-      setLoading(true);
-      try {
-        const res = await apiRequest(`/projects/discover/${user.id}?all=${showAll}`);
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
-        const rows = Array.isArray(data) ? data : (data.data ?? []);
-        setProjects(rows);
-      } catch {
-        setProjects([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProjects();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAll]);
-
-  // assigned projects fetch
-  const fetchAssigned = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const res = await apiRequest(`/projects/assigned/${user.id}`);
-      if (!res.ok) throw new Error("fetch failed");
-      const data = await res.json();
-      const rows = Array.isArray(data) ? data : (data.data ?? []);
-      setAssignedProjects(rows);
-    } catch {
-      setAssignedProjects([]);
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    // ARCH-16 fix: include user?.id in deps so this runs once the auth context
-    // hydrates (user starts as null on first render for slow context loads).
-    fetchAssigned();
-  }, [fetchAssigned]);
-
-  // my bids fetch
-  useEffect(() => {
-    if (!user?.id) return;
-    const fetchBids = async () => {
-      try {
-        const res = await apiRequest(`/bids/developer/${user.id}`);
-        const data = await res.json();
-        const rows = Array.isArray(data) ? data : (data.data ?? []);
-        setMyBids(rows);
-      } catch {
-        setMyBids([]);
-      }
-    };
-    fetchBids();
-  }, []);
-
-  // Navigate to messages tab for a specific project (called from workspace)
   const handleOpenMessages = (projectId) => {
     setMessageProjectId(projectId || null);
     setActiveProject(null);
     setActiveTab("messages");
   };
 
-  // BUG-M4 fix: refresh assignedProjects whenever the workspace signals a
-  // meaningful state change (submission, review, completion). This replaces
-  // the stale onComplete-only callback that only handled one action.
   const handleWorkspaceProjectUpdated = useCallback((updatedProject) => {
-    setAssignedProjects((prev) =>
-      prev.map((p) => p.id === updatedProject.id ? { ...p, ...updatedProject } : p),
-    );
-    // Keep activeProject in sync so the workspace header reflects the change
+    // Invalidate assigned projects so MyProjects + workspace reflect the change
+    queryClient.invalidateQueries({ queryKey: queryKeys.developer.assigned(user?.id) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(updatedProject.id) });
+    // Keep activeProject in sync locally
     setActiveProject((prev) =>
       prev && prev.id === updatedProject.id ? { ...prev, ...updatedProject } : prev,
     );
-  }, []);
+  }, [user?.id]);
 
-  // Called by BidModal on successful bid — immediately prepends the new bid
-  // to myBids so "Active Bids" updates without a manual refresh
   const handleBidPlaced = (newBid) => {
-    setMyBids((prev) => [newBid, ...prev]);
+    // Invalidate bids cache so ActiveBids updates without manual refresh
+    queryClient.invalidateQueries({ queryKey: queryKeys.developer.bids(user?.id) });
   };
 
   return (
@@ -151,57 +97,71 @@ export default function DeveloperDashboard() {
 
           <div className="dd-main">
             {activeProject ? (
-              <ProjectWorkspace
-                project={activeProject}
-                onBack={() => setActiveProject(null)}
-                onOpenMessages={handleOpenMessages}
-                onComplete={handleWorkspaceProjectUpdated}
-                onProjectUpdated={handleWorkspaceProjectUpdated}
-              />
+              <ErrorBoundary label="Developer Workspace">
+                <ProjectWorkspace
+                  project={activeProject}
+                  onBack={() => setActiveProject(null)}
+                  onOpenMessages={handleOpenMessages}
+                  onComplete={handleWorkspaceProjectUpdated}
+                  onProjectUpdated={handleWorkspaceProjectUpdated}
+                />
+              </ErrorBoundary>
             ) : (
               <>
                 {activeTab === "feed" && (
-                  <ProjectFeed
-                    projects={projects}
-                    loading={loading}
-                    search={search}
-                    setSearch={setSearch}
-                    budget={budget}
-                    setBudget={setBudget}
-                    tags={tags}
-                    setTags={setTags}
-                    showAll={showAll}
-                    setShowAll={setShowAll}
-                    view={view}
-                    setView={setView}
-                    selectedProject={selectedProject}
-                    setSelectedProject={setSelectedProject}
-                    allTags={allTags}
-                    setFilteredCount={setFilteredCount}
-                    onBidPlaced={handleBidPlaced}
-                  />
+                  <ErrorBoundary label="Project Feed">
+                    <ProjectFeed
+                      projects={projects}
+                      loading={loading}
+                      search={search}
+                      setSearch={setSearch}
+                      budget={budget}
+                      setBudget={setBudget}
+                      tags={tags}
+                      setTags={setTags}
+                      showAll={showAll}
+                      setShowAll={setShowAll}
+                      view={view}
+                      setView={setView}
+                      selectedProject={selectedProject}
+                      setSelectedProject={setSelectedProject}
+                      allTags={allTags}
+                      setFilteredCount={setFilteredCount}
+                      onBidPlaced={handleBidPlaced}
+                    />
+                  </ErrorBoundary>
                 )}
                 {activeTab === "active" && (
-                  <ActiveBids
-                    bids={myBids}
-                    view={bidsView}
-                    setView={setBidsView}
-                  />
+                  <ErrorBoundary label="Active Bids">
+                    <ActiveBids
+                      bids={myBids}
+                      view={bidsView}
+                      setView={setBidsView}
+                    />
+                  </ErrorBoundary>
                 )}
                 {activeTab === "my-projects" && (
-                  <MyProjects
-                    assignedProjects={assignedProjects}
-                    onOpenProject={setActiveProject}
-                  />
+                  <ErrorBoundary label="My Projects">
+                    <MyProjects
+                      assignedProjects={assignedProjects}
+                      onOpenProject={setActiveProject}
+                    />
+                  </ErrorBoundary>
                 )}
                 {activeTab === "messages" && (
-                  <DeveloperMessages initialProjectId={messageProjectId} />
+                  <ErrorBoundary label="Messages">
+                    <DeveloperMessages initialProjectId={messageProjectId} />
+                  </ErrorBoundary>
                 )}
                 {activeTab === "ratings" && (
-                  <DeveloperRatings />
+                  <ErrorBoundary label="Ratings">
+                    <DeveloperRatings />
+                  </ErrorBoundary>
                 )}
                 {activeTab === "settings" && (
-                  <DeveloperSettings />
+                  <ErrorBoundary label="Settings">
+                    <DeveloperSettings />
+                  </ErrorBoundary>
                 )}
               </>
             )}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import "./ClientDashboard.css";
 import CreateProjectModal from "../../components/CreateProjectModal";
 import TopBar from "../../components/TopBar";
@@ -11,8 +11,12 @@ import ClientProjectsPanel from "../sections/ClientProjectsPanel";
 import ClientMessages from "../sections/ClientMessages";
 import ClientPayments from "../sections/ClientPayments";
 import ClientProjectWorkspace from "../sections/ClientProjectWorkspace";
-import { apiRequest } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
+import { useClientProjects } from "../../hooks/useProjectQueries";
+import { queryClient } from "../../lib/queryClient";
+import { queryKeys } from "../../lib/queryKeys";
+import ErrorBoundary from "../../components/ErrorBoundary";
+import "../../components/ErrorBoundary.css";
 
 function formatProjectForCard(p) {
   const hasBudgetText = typeof p.budget === "string" && p.budget.trim();
@@ -49,8 +53,6 @@ function formatProjectForCard(p) {
 export default function ClientDashboard() {
   const { currentUser: user } = useAuth();
 
-  const [light, setLight] = useState(false);
-  const [projects, setProjects] = useState([]);
   const [tabTone, setTabTone] = useState("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [section, setSection] = useState("overview");
@@ -59,65 +61,34 @@ export default function ClientDashboard() {
 
   const [selectedProject, setSelectedProject] = useState(null);
   const [activeProject, setActiveProject] = useState(null);
-  // For "Message Developer" deep-link from workspace
   const [messageProjectId, setMessageProjectId] = useState(null);
 
   useRipple(shellRef, "ripple-wave");
 
+  // Replace manual fetch with TanStack Query
+  const { data: rawProjects = [] } = useClientProjects();
+  const projects = rawProjects.map(formatProjectForCard);
+
   const handleNewProject = (project) => {
-    setProjects((prev) => [formatProjectForCard(project), ...prev]);
+    // Invalidate the projects list so TanStack Query refetches with the new project
+    queryClient.invalidateQueries({ queryKey: queryKeys.projects.list() });
   };
 
-  // Called from ClientProjectWorkspace "Message Developer" button
   const handleNavigateToMessages = (projectId) => {
     setMessageProjectId(projectId || null);
     setActiveProject(null);
     setSection("messages");
   };
 
-  // ARCH-15 / BUG-M3 fix: when the client approves or requests revision inside
-  // the workspace, propagate the updated project back into the projects array so
-  // the status badge on the Projects panel reflects the change immediately.
   const handleProjectUpdated = (updatedProject) => {
-    setProjects((prev) =>
-      prev.map((p) =>
-        p.id === updatedProject.id ? formatProjectForCard(updatedProject) : p,
-      ),
-    );
-    // Also keep activeProject in sync so the workspace header badge is correct
+    // Invalidate the specific project detail so all components see the update
+    queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(updatedProject.id) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.projects.list() });
+    // Keep activeProject in sync locally
     setActiveProject((prev) =>
       prev && prev.id === updatedProject.id ? { ...prev, ...updatedProject } : prev,
     );
   };
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchProjects = async () => {
-      try {
-        const response = await apiRequest("/api/projects", {
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch projects: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const rows = Array.isArray(data) ? data : (data.data ?? []);
-        setProjects(rows.map((project) => formatProjectForCard(project)));
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          console.error("Error fetching projects:", error);
-          setProjects([]);
-        }
-      }
-    };
-
-    fetchProjects();
-
-    return () => controller.abort();
-  }, []);
 
   return (
     <div className="client-theme">
@@ -127,11 +98,11 @@ export default function ClientDashboard() {
         </div>
         <div
           ref={shellRef}
-          className={`db-shell${light ? " db-shell--light" : ""}`}
+          className={`db-shell`}
         >
           <Background
             variant="client"
-            light={light}
+            light={false}
             mousePos={mousePos}
             tabTone={tabTone}
           />
@@ -146,37 +117,49 @@ export default function ClientDashboard() {
           />
           <div className="db-main">
             {section === "overview" && (
-              <ClientOverview
-                user={user}
-                projects={projects}
-                onOpenCreateProject={() => setShowCreateModal(true)}
-                onTabChange={setTabTone}
-                onViewProject={setSelectedProject}
-              />
+              <ErrorBoundary label="Overview">
+                <ClientOverview
+                  user={user}
+                  projects={projects}
+                  onOpenCreateProject={() => setShowCreateModal(true)}
+                  onTabChange={setTabTone}
+                  onViewProject={setSelectedProject}
+                />
+              </ErrorBoundary>
             )}
             {section === "projects" && (
-              <>
-                {!activeProject && (
-                  <ClientProjectsPanel
-                    projects={projects}
-                    onTabChange={setTabTone}
-                    onViewProject={setActiveProject}
-                  />
-                )}
-                {activeProject && (
-                  <ClientProjectWorkspace
-                    project={activeProject}
-                    onBack={() => setActiveProject(null)}
-                    onNavigateToMessages={handleNavigateToMessages}
-                    onProjectUpdated={handleProjectUpdated}
-                  />
-                )}
-              </>
+              <ErrorBoundary label="Projects">
+                <>
+                  {!activeProject && (
+                    <ClientProjectsPanel
+                      projects={projects}
+                      onTabChange={setTabTone}
+                      onViewProject={setActiveProject}
+                    />
+                  )}
+                  {activeProject && (
+                    <ErrorBoundary label="Project Workspace">
+                      <ClientProjectWorkspace
+                        project={activeProject}
+                        onBack={() => setActiveProject(null)}
+                        onNavigateToMessages={handleNavigateToMessages}
+                        onProjectUpdated={handleProjectUpdated}
+                      />
+                    </ErrorBoundary>
+                  )}
+                </>
+              </ErrorBoundary>
             )}
             {section === "messages" && (
-              <ClientMessages initialProjectId={messageProjectId} />
+              <ErrorBoundary label="Messages">
+                <ClientMessages initialProjectId={messageProjectId} />
+              </ErrorBoundary>
             )}
-            {section === "payments" && <ClientPayments />}
+            {section === "payments" && (
+              <ErrorBoundary label="Payments">
+                <ClientPayments />
+              </ErrorBoundary>
+            )}
           </div>
           {showCreateModal && (
             <CreateProjectModal

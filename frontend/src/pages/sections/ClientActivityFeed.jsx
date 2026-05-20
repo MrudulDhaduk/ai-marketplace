@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
-import { apiRequest } from "../../lib/api";
-import { socket } from "../../socket";
+import { useEffect } from "react";
+import { useSocket } from "../../context/SocketContext";
+import { useClientActivity } from "../../hooks/useProjectQueries";
+import { queryClient } from "../../lib/queryClient";
+import { queryKeys } from "../../lib/queryKeys";
 
 /* ── event type → dot colour + label ─────────────── */
 const EVENT_META = {
@@ -39,41 +41,26 @@ function buildText(event) {
 }
 
 export default function ClientActivityFeed() {
-  const [feed, setFeed] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const socket = useSocket();
+  const { data: feed = [], isLoading: loading } = useClientActivity();
 
-  const fetchFeed = () => {
-    apiRequest("/api/activity/client?limit=10")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (data?.data) setFeed(data.data);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
+  /* Invalidate the cached activity query when relevant socket events fire.
+     TanStack Query handles the actual refetch — no manual fetch() needed. */
   useEffect(() => {
-    fetchFeed();
-  }, []);
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.client.activity() });
+    };
 
-  /* Refresh feed when relevant socket events fire.
-     Backend emits `notification` to user room for bid/submission/review events.
-     Backend also emits named events to project rooms — listen to both. */
-  useEffect(() => {
-    const refresh = () => fetchFeed();
-
-    // `notification` is emitted to user_${id} room for all project events
-    socket.on("notification", refresh);
-    // Project-room events (when user is in a project room)
-    socket.on("project_submitted", refresh);
-    socket.on("project_reviewed",  refresh);
+    socket.on("notification",      invalidate);
+    socket.on("project_submitted", invalidate);
+    socket.on("project_reviewed",  invalidate);
 
     return () => {
-      socket.off("notification",      refresh);
-      socket.off("project_submitted", refresh);
-      socket.off("project_reviewed",  refresh);
+      socket.off("notification",      invalidate);
+      socket.off("project_submitted", invalidate);
+      socket.off("project_reviewed",  invalidate);
     };
-  }, []);
+  }, [socket]);
 
   return (
     <aside className="feed">

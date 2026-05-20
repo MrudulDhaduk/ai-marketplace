@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../../lib/api";
-import { socket } from "../../socket";
+import { useSocket } from "../../context/SocketContext";
 import { useAuth } from "../../context/AuthContext";
+import { useAssignedProjects } from "../../hooks/useProjectQueries";
 
 /* ── helpers ─────────────────────────────────────── */
 function timeAgo(dateStr) {
@@ -23,7 +24,9 @@ function ProjectPicker({ projects, selected, onSelect }) {
         <span className="msg-sidebar-title">Projects</span>
       </div>
       {projects.length === 0 && (
-        <p className="msg-sidebar-empty">No active projects yet. Get assigned to a project to start messaging.</p>
+        <p className="msg-sidebar-empty">
+          No active projects yet. Get assigned to a project to start messaging.
+        </p>
       )}
       <ul className="msg-project-list">
         {projects.map((p) => (
@@ -43,6 +46,8 @@ function ProjectPicker({ projects, selected, onSelect }) {
 
 /* ── chat panel ──────────────────────────────────── */
 function ChatPanel({ project, currentUser }) {
+  /* useSocket() instead of importing the singleton directly */
+  const socket = useSocket();
   const [messages, setMessages] = useState([]);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -51,21 +56,17 @@ function ChatPanel({ project, currentUser }) {
   const bottomRef = useRef(null);
   const typingTimer = useRef(null);
 
-  const fetchMessages = useCallback(async () => {
+  /* fetch messages on project change */
+  useEffect(() => {
     if (!project?.id) return;
-    try {
-      const r = await apiRequest(`/projects/${project.id}/messages`);
-      if (!r.ok) return;
-      const data = await r.json();
-      setMessages(data.data ?? []);
-    } catch {}
+    setMessages([]);
+    apiRequest(`/projects/${project.id}/messages`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data) setMessages(data.data ?? []); })
+      .catch(() => {});
   }, [project?.id]);
 
-  useEffect(() => {
-    setMessages([]);
-    fetchMessages();
-  }, [fetchMessages]);
-
+  /* join socket room + realtime listeners */
   useEffect(() => {
     if (!project?.id) return;
     socket.emit("join_project", project.id);
@@ -84,18 +85,21 @@ function ChatPanel({ project, currentUser }) {
     };
 
     socket.on("new_message", handleNewMessage);
-    socket.on("typing", handleTyping);
+    socket.on("typing",      handleTyping);
+
     return () => {
       socket.off("new_message", handleNewMessage);
-      socket.off("typing", handleTyping);
+      socket.off("typing",      handleTyping);
       socket.emit("leave_project", project.id);
     };
-  }, [project?.id, currentUser?.id]);
+  }, [project?.id, currentUser?.id, socket]);
 
+  /* scroll to bottom on new messages */
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  /* typing indicator */
   const handleInputChange = (e) => {
     setBody(e.target.value);
     socket.emit("typing", { projectId: project.id, typing: true });
@@ -133,7 +137,9 @@ function ChatPanel({ project, currentUser }) {
       <div className="msg-chat-head">
         <div>
           <span className="msg-chat-title">{project.title}</span>
-          <span className={`msg-project-status msg-status--${project.status}`}>{project.status}</span>
+          <span className={`msg-project-status msg-status--${project.status}`}>
+            {project.status}
+          </span>
         </div>
       </div>
 
@@ -146,7 +152,9 @@ function ChatPanel({ project, currentUser }) {
           return (
             <div key={msg.id} className={`msg-bubble-row${isMine ? " msg-bubble-row--mine" : ""}`}>
               {!isMine && (
-                <span className="msg-avatar">{(msg.sender_username || "?")[0].toUpperCase()}</span>
+                <span className="msg-avatar">
+                  {(msg.sender_username || "?")[0].toUpperCase()}
+                </span>
               )}
               <div className={`msg-bubble${isMine ? " msg-bubble--mine" : ""}`}>
                 {!isMine && <span className="msg-sender">{msg.sender_username}</span>}
@@ -186,28 +194,26 @@ function ChatPanel({ project, currentUser }) {
 /* ── main component ──────────────────────────────── */
 export default function DeveloperMessages({ initialProjectId }) {
   const { currentUser } = useAuth();
-  const [projects, setProjects] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [loading, setLoading] = useState(true);
 
+  /*
+   * Reuse the shared assigned-projects query — no duplicate fetch.
+   * DeveloperDashboard already fetches this; this component gets the
+   * cached result for free.
+   */
+  const { data: projects = [], isLoading: loading } = useAssignedProjects(currentUser?.id);
+
+  /* Auto-select on load / when initialProjectId changes */
   useEffect(() => {
-    if (!currentUser?.id) return;
-    apiRequest(`/projects/assigned/${currentUser.id}?limit=50`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        const rows = data?.data ?? [];
-        setProjects(rows);
-        // Auto-select initialProjectId if provided, else first project
-        if (initialProjectId) {
-          const target = rows.find((p) => p.id === initialProjectId);
-          setSelected(target || rows[0] || null);
-        } else if (rows.length > 0) {
-          setSelected(rows[0]);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [currentUser?.id, initialProjectId]);
+    if (projects.length === 0) return;
+    if (initialProjectId) {
+      const target = projects.find((p) => p.id === initialProjectId);
+      setSelected(target || projects[0] || null);
+    } else if (!selected) {
+      setSelected(projects[0]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects.length, initialProjectId]);
 
   if (loading) {
     return (

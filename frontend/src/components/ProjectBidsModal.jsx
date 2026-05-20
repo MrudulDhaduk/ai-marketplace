@@ -1,27 +1,15 @@
-import { useEffect, useState } from "react";
 import "./ProjectBidsModal.css";
 import { apiRequest } from "../lib/api";
+import { useProjectBids } from "../hooks/useProjectQueries";
+import { queryClient } from "../lib/queryClient";
+import { queryKeys } from "../lib/queryKeys";
 
 export default function ProjectBidsModal({ project, onClose }) {
-  const [bids, setBids] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchBids();
-  }, []);
-
-  const fetchBids = async () => {
-    try {
-      const res = await apiRequest(`/api/projects/${project.id}/bids`);
-      const data = await res.json();
-      const rows = Array.isArray(data) ? data : (data.data ?? []);
-      setBids(rows);
-    } catch {
-      setBids([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  /*
+   * Replace manual useEffect + fetch (which had a missing project.id dep)
+   * with useProjectBids — properly keyed on project.id, no stale data.
+   */
+  const { data: bids = [], isLoading: loading } = useProjectBids(project?.id);
 
   const acceptBid = async (bidId) => {
     try {
@@ -29,12 +17,15 @@ export default function ProjectBidsModal({ project, onClose }) {
         `/api/projects/${project.id}/accept-bid/${bidId}`,
         { method: "POST" }
       );
-      fetchBids();
+      // Invalidate bids cache so the list refreshes with the accepted status
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.bids(project.id) });
+      // Also invalidate the project list so the dashboard badge updates
+      queryClient.invalidateQueries({ queryKey: queryKeys.projects.list() });
     } catch {
       // ignore
     }
   };
-  const hasAccepted = bids.some((b) => b.status === "accepted");
+
   return (
     <div className="modal-overlay">
       <div className="modal-content">
@@ -45,7 +36,7 @@ export default function ProjectBidsModal({ project, onClose }) {
         ) : bids.length === 0 ? (
           <p>No bids yet</p>
         ) : (
-          (Array.isArray(bids) ? bids : []).map((bid) => (
+          bids.map((bid) => (
             <div key={bid.id} className="bid-card">
               <h4>
                 {bid.first_name} {bid.last_name}

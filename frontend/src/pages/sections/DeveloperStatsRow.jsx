@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { apiRequest } from "../../lib/api";
+import { useDeveloperStats } from "../../hooks/useProjectQueries";
 
 /* ── animated count-up ─────────────────────────── */
 function useCountUp(target, ms = 1200, delay = 0) {
@@ -45,19 +45,7 @@ const STAT_DEFS = [
 ];
 
 export default function DeveloperStatsRow() {
-  const [stats, setStats] = useState({
-    activeProjects: 0,
-    totalBids: 0,
-    totalEarned: 0,
-    completedProjects: 0,
-  });
-
-  useEffect(() => {
-    apiRequest("/api/stats/developer")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data) setStats(data); })
-      .catch(() => {});
-  }, []);
+  const { data: stats = {} } = useDeveloperStats();
 
   return (
     <div className="stats-row">
