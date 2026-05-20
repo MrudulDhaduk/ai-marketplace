@@ -243,7 +243,7 @@ function EmptyState({ filter }) {
 }
 
 /* ─── main component ─────────────────────────────────────────────────────────── */
-export default React.memo(function SubmissionHistory({ projectId, token, isClient = false }) {
+export default React.memo(function SubmissionHistory({ projectId, isClient = false }) {
   const socket = useSocket();
 
   /* ── manual notes UI state (preserved) ── */

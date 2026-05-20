@@ -158,10 +158,15 @@ export default function BidModal({ project, onClose, onBidPlaced }) {
       setLoading(true);
       setError("");
 
+      // Idempotency key scoped to this project + bid amount to prevent
+      // duplicate bids from double-clicks or network retries
+      const idempotencyKey = `bid-${project.id}-${numAmount}-${Date.now()}`;
+
       const res = await apiRequest(
         `/projects/${project.id}/bid`,
         {
           method: "POST",
+          headers: { "Idempotency-Key": idempotencyKey },
           body: JSON.stringify({
             amount: numAmount,
             proposal: proposal.trim(),

@@ -48,9 +48,12 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 setupSockets(io);
 app.use(createRoutes(io));
 
-// Serve local uploads only when disk storage is active
+// Serve local uploads only when disk storage is active.
+// Files are gated behind authentication — the static middleware runs AFTER
+// authenticateUser so unauthenticated requests get a 401, not the file.
 if (uploadDir) {
-  app.use("/uploads", express.static(uploadDir, { dotfiles: "deny", index: false, maxAge: config.isProduction ? "1d" : 0 }));
+  const { authenticateUser } = require("./middleware/auth");
+  app.use("/uploads", authenticateUser, express.static(uploadDir, { dotfiles: "deny", index: false, maxAge: 0 }));
 }
 
 // ── Error handlers (order matters) ───────────────────────────────────────────

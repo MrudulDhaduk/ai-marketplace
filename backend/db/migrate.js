@@ -42,6 +42,8 @@ const MIGRATION_FILES = [
   "005_required_additions.sql",
   "006_workspace_activity.sql",
   "007_schema_stabilization.sql",
+  "008_email_verification.sql",
+  "009_refresh_tokens.sql",
 ];
 
 async function runMigrations() {

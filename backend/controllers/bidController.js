@@ -16,6 +16,22 @@ async function placeBid(req, res) {
     const error = validateBid({ amount, proposal });
     if (error) return res.status(400).json({ message: error });
 
+    // Idempotency: if the developer already has a bid on this project,
+    // return the existing bid instead of erroring. This handles double-clicks
+    // and network retries transparently.
+    const existingBid = await pool.query(
+      "SELECT * FROM bids WHERE project_id = $1 AND developer_id = $2",
+      [id, developerId],
+    );
+
+    if (existingBid.rows.length) {
+      return res.status(200).json({
+        message: "Bid already placed",
+        bid: existingBid.rows[0],
+        idempotent: true,
+      });
+    }
+
     const projectRes = await pool.query(
       `SELECT id, title, client_id, assigned_developer_id, status FROM projects WHERE id = $1`,
       [id],
@@ -35,24 +51,22 @@ async function placeBid(req, res) {
       return res.status(400).json({ message: "Project is not accepting bids" });
     }
 
-    const existingBid = await pool.query(
-      "SELECT 1 FROM bids WHERE project_id = $1 AND developer_id = $2",
-      [id, developerId],
-    );
-
-    if (existingBid.rows.length) {
-      return res.status(409).json({ message: "You already placed a bid on this project" });
-    }
-
     const result = await pool.query(
       `INSERT INTO bids (project_id, developer_id, amount, proposal)
        VALUES ($1, $2, $3, $4)
+       ON CONFLICT (project_id, developer_id) DO NOTHING
        RETURNING id, project_id, developer_id, amount, proposal, status, created_at`,
       [id, developerId, Number(amount), proposal.trim()],
     );
 
+    // ON CONFLICT DO NOTHING returns no rows — fetch the existing bid
+    const bid = result.rows[0] || (await pool.query(
+      "SELECT id, project_id, developer_id, amount, proposal, status, created_at FROM bids WHERE project_id = $1 AND developer_id = $2",
+      [id, developerId],
+    )).rows[0];
+
     // Persist notification + emit socket event
-    if (project.client_id) {
+    if (project.client_id && result.rows.length) {
       await createNotification({
         io: req.io,
         userId: project.client_id,
@@ -62,22 +76,23 @@ async function placeBid(req, res) {
       });
     }
 
-    // Record project event
-    // FIX #13 — include actor_name and actor_role (were missing, causing "Unknown" in timeline)
-    const devRes = await pool.query(
-      "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
-      [developerId],
-    ).catch(() => ({ rows: [] }));
-    const dev = devRes.rows[0];
-    const devActorName = dev ? `${dev.first_name || ""} ${dev.last_name || ""}`.trim() || dev.username : "Unknown";
+    // Record project event only for new bids (not idempotent replays)
+    if (result.rows.length) {
+      const devRes = await pool.query(
+        "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
+        [developerId],
+      ).catch(() => ({ rows: [] }));
+      const dev = devRes.rows[0];
+      const devActorName = dev ? `${dev.first_name || ""} ${dev.last_name || ""}`.trim() || dev.username : "Unknown";
 
-    await pool.query(
-      `INSERT INTO project_events (project_id, actor_id, event_type, meta, actor_name, actor_role)
-       VALUES ($1, $2, 'bid_placed', $3, $4, $5)`,
-      [id, developerId, JSON.stringify({ amount: Number(amount) }), devActorName, dev?.role || "developer"],
-    ).catch((e) => logger.error("project_events insert error", e));
+      await pool.query(
+        `INSERT INTO project_events (project_id, actor_id, event_type, meta, actor_name, actor_role)
+         VALUES ($1, $2, 'bid_placed', $3, $4, $5)`,
+        [id, developerId, JSON.stringify({ amount: Number(amount) }), devActorName, dev?.role || "developer"],
+      ).catch((e) => logger.error("project_events insert error", e));
+    }
 
-    res.status(201).json({ message: "Bid placed successfully", bid: result.rows[0] });
+    res.status(201).json({ message: "Bid placed successfully", bid });
   } catch (err) {
     logger.error("placeBid error", err);
     res.status(500).json({ message: "Error placing bid" });
@@ -175,7 +190,13 @@ async function acceptBid(req, res) {
 
     if (bid.status === "accepted") {
       await client.query("ROLLBACK");
-      return res.status(400).json({ error: "Bid already accepted" });
+      // Idempotent: already accepted — return success instead of erroring
+      return res.json({
+        message: "Bid accepted successfully",
+        assignedDeveloperId: bid.developer_id,
+        projectId,
+        idempotent: true,
+      });
     }
 
     await client.query(

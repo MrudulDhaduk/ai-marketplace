@@ -61,6 +61,17 @@ services:
       DB_PORT: 5432
       REDIS_URL: redis://redis:6379
       REDIS_ENABLED: "true"
+      # Phase 3: cookie auth requires the frontend origin to be in CORS_ORIGINS
+      # so the browser sends credentials (cookies) cross-origin.
+      # In production set CORS_ORIGINS to your actual frontend domain.
+      CORS_ORIGINS: http://localhost:3000
+      # Phase 3: set APP_URL so verification email links point to the frontend
+      APP_URL: http://localhost:3000
+      # Phase 3: request timeout (30s default — set to 0 to disable)
+      REQUEST_TIMEOUT_MS: "30000"
+      # Phase 3.1: short-lived access tokens (15 min) + 30-day refresh tokens
+      JWT_EXPIRES_IN: "15m"
+      REFRESH_TOKEN_EXPIRES_DAYS: "30"
     ports:
       - "${PORT:-5000}:5000"
     volumes:

@@ -87,7 +87,9 @@ function DeveloperProjectWorkspace({ project, onBack, onOpenMessages, onComplete
   const [demoLink, setDemoLink] = useState("");
   const [notes, setNotes] = useState("");
 
-  const { token } = useAuth();
+  // Phase 3: token is now httpOnly — not accessible to JS.
+  // XHR upload uses withCredentials to send the cookie automatically.
+  const { currentUser } = useAuth();
   const socket = useSocket();
 
   /* ── Server state via TanStack Query ────────────────────── */
@@ -228,7 +230,13 @@ function DeveloperProjectWorkspace({ project, onBack, onOpenMessages, onComplete
     };
     xhr.onerror = () => { setUploadProgress(0); console.error("Upload request failed"); };
     xhr.open("POST", `${API_BASE_URL}/projects/${project.id}/upload`);
-    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    // Phase 3: auth cookie is sent automatically via withCredentials.
+    // No Bearer header needed — the httpOnly cookie carries the JWT.
+    xhr.withCredentials = true;
+    // Multipart uploads are exempt from CSRF middleware (it can't parse them),
+    // but we still send the token as a best-practice defence-in-depth measure.
+    const csrfCookie = document.cookie.match(/(?:^|;\s*)x-csrf-token=([^;]+)/);
+    if (csrfCookie) xhr.setRequestHeader("x-csrf-token", decodeURIComponent(csrfCookie[1]));
     xhr.send(formData);
   };
 
@@ -265,8 +273,11 @@ function DeveloperProjectWorkspace({ project, onBack, onOpenMessages, onComplete
     setSubmissionState("submitting");
     setShowConfirm(false);
     try {
+      // Idempotency key prevents duplicate submissions from double-clicks or retries
+      const idempotencyKey = `submit-${project.id}-${Date.now()}`;
       const res = await apiRequest(`/projects/${project.id}/submit`, {
         method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
         body: JSON.stringify({ repoLink, demoLink, notes }),
       });
       const data = await res.json();

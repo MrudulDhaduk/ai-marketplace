@@ -250,6 +250,7 @@ function Signup() {
   const [focused, setFocused] = useState("");
   const [errors, setErrors] = useState({});
   const [shaking, setShaking] = useState(false);
+  const [success, setSuccess] = useState(false);
   const formRef = useRef(null);
   const navigate = useNavigate();
 
@@ -310,9 +311,8 @@ function Signup() {
         }
         return;
       }
-      const data = await res.json();
-      // redirect
-      navigate("/login");
+      // Show email verification pending screen
+      setSuccess(true);
     } catch (err) {
       setErrors({ general: "Something went wrong. Please try again." });
     }
@@ -320,6 +320,33 @@ function Signup() {
 
   const halfFields = FIELDS.filter((f) => f.half);
   const fullFields = FIELDS.filter((f) => !f.half);
+
+  // Email verification pending screen
+  if (success) {
+    return (
+      <div className="auth-page">
+        <div className="auth-bg">
+          <div className="auth-orb auth-orb--1" />
+          <div className="auth-orb auth-orb--2" />
+          <div className="auth-grid" />
+        </div>
+        <div className="auth-right" style={{ width: "100%", justifyContent: "center" }}>
+          <div className="auth-card" style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📧</div>
+            <h2>Check your email</h2>
+            <p style={{ color: "#94a3b8", marginBottom: 24 }}>
+              We sent a verification link to <strong>{form.email}</strong>.
+              Click the link to activate your account before logging in.
+            </p>
+            <p style={{ fontSize: 13, color: "#64748b" }}>
+              Didn't receive it?{" "}
+              <Link to="/login" className="auth-link">Go to login</Link> to resend.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-page">

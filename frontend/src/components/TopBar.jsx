@@ -165,8 +165,8 @@ export default function TopBar({
     } catch {}
   }, [notifications]);
 
-  const handleLogout = useCallback(() => {
-    logout();
+  const handleLogout = useCallback(async () => {
+    await logout();
     navigate("/login");
   }, [logout, navigate]);
 

@@ -17,7 +17,7 @@ root.render(
     {/*
       Provider order matters:
         1. QueryClientProvider  — must be outermost data layer
-        2. AuthProvider         — reads localStorage, manages token state
+        2. AuthProvider         — validates session via /auth/me cookie, manages user state
         3. SocketProvider       — depends on AuthContext (isAuthenticated)
         4. App                  — routing + pages
     */}

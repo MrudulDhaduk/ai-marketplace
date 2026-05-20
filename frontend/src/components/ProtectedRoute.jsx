@@ -3,18 +3,18 @@ import { useAuth } from "../context/AuthContext";
 
 /**
  * ProtectedRoute
- * Redirects to /login if:
- *  - no token exists
- *  - token is expired (auto-logs out and redirects)
  *
- * Optionally pass `role` to restrict to a specific user role.
+ * Phase 3 change: AuthContext now validates the session via /auth/me on mount,
+ * so there's a brief loading window. We render nothing (null) during that window
+ * to avoid a flash-redirect to /login for users with valid cookies.
  */
 const ProtectedRoute = ({ children, role }) => {
-  const { isAuthenticated, currentUser, logout } = useAuth();
+  const { isAuthenticated, loading, currentUser } = useAuth();
+
+  // Still rehydrating session from cookie — don't redirect yet
+  if (loading) return null;
 
   if (!isAuthenticated) {
-    // clearAuthSession already called by isAuthenticated check via isTokenExpired
-    logout();
     return <Navigate to="/login" replace />;
   }
 

@@ -38,7 +38,7 @@ function SkillTag({ skill, onRemove, saving }) {
 }
 
 export default function DeveloperSettings() {
-  const { currentUser, login, token } = useAuth();
+  const { currentUser } = useAuth();
   const userId = currentUser?.id;
 
   /* bio state */

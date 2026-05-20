@@ -287,7 +287,9 @@ module.exports = { uploadFiles, getProjectFiles, deleteFile, reorderFiles, getFi
 async function getFileUrl(req, res) {
   try {
     const { id } = req.params;
-    const ttl = Number(req.query.ttl) || 3600; // seconds
+    // Cap TTL at 1 hour to limit the window of a leaked signed URL
+    const MAX_TTL = 3600;
+    const ttl = Math.min(MAX_TTL, Math.max(60, Number(req.query.ttl) || MAX_TTL));
 
     const fileResult = await pool.query(
       `SELECT pf.file_name, pf.project_id, p.client_id, p.assigned_developer_id

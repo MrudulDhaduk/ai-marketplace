@@ -12,39 +12,22 @@ function getPagination(query) {
   return { page, limit, offset: (page - 1) * limit };
 }
 
-/** GET /health — real liveness + readiness probe */
+/** GET /health — liveness + readiness probe for load balancers */
 async function healthCheck(_req, res) {
-  const start = Date.now();
   let dbOk = false;
-  let dbLatencyMs = null;
 
   try {
-    const dbStart = Date.now();
     await pool.query("SELECT 1");
-    dbLatencyMs = Date.now() - dbStart;
     dbOk = true;
   } catch (err) {
     logger.error("Health check DB ping failed", err);
   }
 
-  const status = dbOk ? "ok" : "degraded";
-  const httpStatus = dbOk ? 200 : 503;
-
-  res.status(httpStatus).json({
-    status,
+  // Return minimal info — no pool stats, no env name, no internal latency.
+  // Detailed diagnostics belong in internal monitoring, not a public endpoint.
+  res.status(dbOk ? 200 : 503).json({
+    status: dbOk ? "ok" : "degraded",
     ts: new Date().toISOString(),
-    uptime: Math.floor(process.uptime()),
-    env: process.env.NODE_ENV || "development",
-    db: {
-      ok: dbOk,
-      latencyMs: dbLatencyMs,
-      pool: {
-        total: pool.totalCount,
-        idle: pool.idleCount,
-        waiting: pool.waitingCount,
-      },
-    },
-    responseMs: Date.now() - start,
   });
 }
 
@@ -172,7 +155,10 @@ async function getProject(req, res) {
 /** GET /projects/discover/:id — developer project feed with SQL-level filtering */
 async function discoverProjects(req, res) {
   try {
-    const { id } = req.params;
+    // Use req.user.id directly — requireSelfParam already enforces that
+    // req.params.id === req.user.id, but using req.user.id is more explicit
+    // and eliminates any theoretical IDOR if the middleware is ever removed.
+    const userId = req.user.id;
     const { all } = req.query;
     const { page, limit, offset } = getPagination(req.query);
 
@@ -201,7 +187,7 @@ async function discoverProjects(req, res) {
     // Skill-matched feed — filter entirely in SQL using array overlap operator
     const skillsRes = await pool.query(
       "SELECT ARRAY_AGG(LOWER(skill)) AS skills FROM user_skills WHERE user_id = $1",
-      [id],
+      [userId],
     );
     const userSkills = skillsRes.rows[0]?.skills || [];
 

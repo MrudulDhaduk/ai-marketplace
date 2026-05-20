@@ -233,15 +233,15 @@ async function updateSubmission(req, res) {
     const userId = req.user.id;
     const p = project.rows[0];
 
-    // BUG-M6 fix: only the assigned developer may edit their own notes.
-    // The client should be able to read notes but never modify them.
     if (Number(p.assigned_developer_id) !== Number(userId)) {
       return res.status(403).json({ message: "Only the assigned developer can edit submission notes" });
     }
 
+    // IDOR fix: scope the UPDATE to both id AND project_id so a developer
+    // assigned to project A cannot modify a submission row from project B
     const result = await pool.query(
-      "UPDATE project_submissions SET notes = $1 WHERE id = $2 RETURNING *",
-      [notes.trim(), id],
+      "UPDATE project_submissions SET notes = $1 WHERE id = $2 AND project_id = $3 RETURNING *",
+      [notes.trim(), id, projectId],
     );
 
     if (!result.rows.length) return res.status(404).json({ message: "Submission not found" });
@@ -270,15 +270,14 @@ async function deleteSubmission(req, res) {
     const userId = req.user.id;
     const p = project.rows[0];
 
-    // BUG-M7 fix: only the assigned developer may delete their own submission
-    // entries. Allowing the client to delete would corrupt the audit trail.
     if (Number(p.assigned_developer_id) !== Number(userId)) {
       return res.status(403).json({ message: "Only the assigned developer can delete submission entries" });
     }
 
+    // IDOR fix: scope the DELETE to both id AND project_id
     const result = await pool.query(
-      "DELETE FROM project_submissions WHERE id = $1 RETURNING *",
-      [id],
+      "DELETE FROM project_submissions WHERE id = $1 AND project_id = $2 RETURNING *",
+      [id, projectId],
     );
 
     if (!result.rows.length) return res.status(404).json({ message: "Submission not found" });

@@ -3,15 +3,33 @@ const config = require("../config/env");
 const pool = require("../config/db");
 const logger = require("../utils/logger");
 const { captureSocketError } = require("../config/sentry");
+const { AUTH_COOKIE } = require("../config/constants");
+
+// Parse a cookie string into a key→value map
+function parseCookies(cookieHeader = "") {
+  return Object.fromEntries(
+    cookieHeader.split(";").map((c) => {
+      const [k, ...v] = c.trim().split("=");
+      return [k.trim(), decodeURIComponent(v.join("="))];
+    }),
+  );
+}
 
 function setupSockets(io) {
   // ── Auth middleware ──────────────────────────────────────────────────────────
   io.use((socket, next) => {
     try {
-      const token =
-        socket.handshake.auth?.token ||
+      // 1. Try httpOnly cookie (primary — sent via withCredentials on WS upgrade)
+      const cookies = parseCookies(socket.handshake.headers?.cookie || "");
+      const cookieToken = cookies[AUTH_COOKIE];
+
+      // 2. Fall back to Bearer header (legacy clients / non-browser environments)
+      const headerToken = socket.handshake.auth?.token ||
         socket.handshake.headers?.authorization?.replace(/^Bearer\s+/i, "");
+
+      const token = cookieToken || headerToken;
       if (!token) return next(new Error("Unauthorized"));
+
       const decoded = jwt.verify(token, config.jwt.secret);
       socket.user = {
         id: Number(decoded.id),

@@ -1,12 +1,20 @@
 const jwt = require("jsonwebtoken");
 const config = require("../config/env");
+const { AUTH_COOKIE } = require("../config/constants");
+
+function extractToken(req) {
+  // 1. Prefer httpOnly cookie (primary auth mechanism post-Phase 3)
+  if (req.cookies?.[AUTH_COOKIE]) return req.cookies[AUTH_COOKIE];
+  // 2. Fall back to Authorization header (used by Socket.IO handshake and
+  //    any legacy clients during the cookie migration window)
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) return authHeader.slice(7).trim();
+  return null;
+}
 
 function authenticateUser(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  const token = authHeader.slice(7).trim();
+  const token = extractToken(req);
+  if (!token) return res.status(401).json({ message: "Unauthorized" });
   try {
     const decoded = jwt.verify(token, config.jwt.secret);
     req.user = { id: Number(decoded.id), username: decoded.username, role: decoded.role };
@@ -41,14 +49,13 @@ function requireSelfParam(param = "id") {
  * authenticated users (e.g. public profile view).
  */
 function optionalAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) return next();
-  const token = authHeader.slice(7).trim();
+  const token = extractToken(req);
+  if (!token) return next();
   try {
     const decoded = jwt.verify(token, config.jwt.secret);
     req.user = { id: Number(decoded.id), username: decoded.username, role: decoded.role };
   } catch {
-    // invalid/expired token — just proceed without user
+    // invalid/expired token — proceed without user
   }
   return next();
 }

@@ -4,6 +4,7 @@ import '../auth.css';
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+
 /* ─────────────────────────────────────────
    Reusable AuthInput (mirrors Signup page)
 ───────────────────────────────────────── */
@@ -114,6 +115,19 @@ function Login() {
     setTimeout(() => setShake(false), 420);
   };
 
+  /* Resend verification email */
+  const handleResendVerification = async () => {
+    try {
+      await apiRequest('/auth/resend-verification', {
+        method: 'POST',
+        body: JSON.stringify({ email: form.username }), // username field may hold email
+      });
+      setErrors({ general: 'Verification email sent. Please check your inbox.' });
+    } catch {
+      setErrors({ general: 'Failed to resend. Please try again.' });
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -138,14 +152,20 @@ function Login() {
 
       const data = await res.json();
       if (!res.ok) {
-        /* Server returned an error — surface it as a banner */
-        setErrors({
-          general: data?.message || 'Invalid username or password. Please try again.',
-        });
+        if (data?.code === 'EMAIL_NOT_VERIFIED') {
+          setErrors({
+            general: 'Please verify your email address before logging in. Check your inbox or resend the verification email.',
+            emailNotVerified: true,
+          });
+        } else {
+          setErrors({
+            general: data?.message || 'Invalid username or password. Please try again.',
+          });
+        }
         triggerShake();
       } else {
-        /* Success — store via AuthContext (handles localStorage internally) */
-        login({ token: data.token, user: data.user });
+        /* Success — cookie is set by server; store user display data via AuthContext */
+        await login({ user: data.user });
         navigate("/dashboard");
       }
     } catch {
@@ -225,7 +245,17 @@ function Login() {
                 <circle cx="10" cy="10" r="9" stroke="#f87171" strokeWidth="1.6"/>
                 <path d="M10 5.5v5M10 13.5v.5" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round"/>
               </svg>
-              {errors.general}
+              <span>
+                {errors.general}
+                {errors.emailNotVerified && (
+                  <> <button
+                    type="button"
+                    className="auth-link"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
+                    onClick={handleResendVerification}
+                  >Resend verification email</button></>
+                )}
+              </span>
             </div>
           )}
 
