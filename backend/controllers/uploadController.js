@@ -257,22 +257,25 @@ async function reorderFiles(req, res) {
 
     const projectId = ownership.rows[0].project_id;
 
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      for (const item of updates) {
-        await client.query(
-          "UPDATE project_files SET position = $1 WHERE id = $2",
-          [item.position, item.id],
-        );
-      }
-      await client.query("COMMIT");
-    } catch (transactionError) {
-      await client.query("ROLLBACK");
-      throw transactionError;
-    } finally {
-      client.release();
-    }
+    // Phase 5 — single VALUES-based bulk UPDATE replaces the N-round-trip
+    // transaction loop. Benefits:
+    //   • 1 DB round-trip instead of N
+    //   • Row locks acquired and released atomically in one statement
+    //   • Shorter transaction window → less lock contention under concurrent use
+    //   • Single WAL record per page touched instead of N separate records
+    // A single statement is already atomic so no explicit transaction needed.
+    const params = updates.flatMap((item, i) => [item.id, item.position]);
+    const placeholders = updates
+      .map((_, i) => `($${i * 2 + 1}::int, $${i * 2 + 2}::int)`)
+      .join(", ");
+
+    await pool.query(
+      `UPDATE project_files AS pf
+       SET position = v.position
+       FROM (VALUES ${placeholders}) AS v(id, position)
+       WHERE pf.id = v.id`,
+      params,
+    );
 
     // Emit socket event so the client's file list order updates in realtime.
     if (projectId) {

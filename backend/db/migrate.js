@@ -45,6 +45,9 @@ const MIGRATION_FILES = [
   "008_email_verification.sql",
   "009_refresh_tokens.sql",
   "010_phase4_realtime.sql",
+  "011_phase5_performance.sql",
+  "012_phase5_index_cleanup.sql",
+  "013_phase5_gin_tags.sql",
 ];
 
 async function runMigrations() {

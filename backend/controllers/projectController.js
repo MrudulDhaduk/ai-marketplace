@@ -4,6 +4,7 @@ const { validateProject } = require("../utils/validation");
 const { createNotification } = require("../services/notificationService");
 const { EVENTS, emitTypedEvent } = require("../sockets/socketEvents");
 const { emitToRoomWithAck } = require("../sockets/socketAck");
+const { invalidateStatsCache } = require("./statsController");
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -42,6 +43,13 @@ async function createProject(req, res) {
   if (error) return res.status(400).json({ message: error });
 
   try {
+    // Phase 5 — normalize tags to lowercase+trimmed at write time so the GIN
+    // index on projects.tags can be used directly with the && operator without
+    // a per-row UNNEST/ARRAY_AGG transformation at query time.
+    const normalizedTags = Array.isArray(tags)
+      ? tags.map((t) => String(t).toLowerCase().trim()).filter(Boolean)
+      : [];
+
     const result = await pool.query(
       `INSERT INTO projects (title, description, min_budget, max_budget, due_date, status, tags, client_id)
        VALUES ($1, $2, $3, $4, $5, 'bidding', $6, $7)
@@ -52,12 +60,15 @@ async function createProject(req, res) {
         Number(minBudget),
         Number(maxBudget),
         dueDate,
-        Array.isArray(tags) ? tags : [],
+        normalizedTags,
         userId,
       ],
     );
 
     res.status(201).json(result.rows[0]);
+
+    // Invalidate stats cache — a new project changes the client's active_projects count.
+    invalidateStatsCache({ clientId: userId }).catch(() => {});
   } catch (err) {
     logger.error("createProject error", err);
     res.status(500).json({ message: "Error creating project" });
@@ -197,15 +208,19 @@ async function discoverProjects(req, res) {
       return res.json({ data: [], pagination: { page, limit, total: 0, pages: 0 } });
     }
 
-    // Use PostgreSQL array overlap (&&) to match tags against user skills
+    // Phase 5 — direct && operator on the tags column so PostgreSQL can use
+    // the GIN index (idx_projects_tags_gin). The previous correlated subquery
+    // (SELECT ARRAY_AGG(LOWER(t)) FROM UNNEST(tags) AS t) forced a sequential
+    // scan on every request because the planner cannot use an index on a
+    // derived expression. User skills are already lowercased above; tags are
+    // now stored lowercase at write time (createProject normalization), so
+    // the && comparison is case-consistent without any per-row transformation.
     const [dataResult, countResult] = await Promise.all([
       pool.query(
         `SELECT id, title, description, min_budget, max_budget, due_date, status, tags, submitted_at
          FROM projects
          WHERE status IN ('open', 'bidding')
-           AND (
-             SELECT ARRAY_AGG(LOWER(t)) FROM UNNEST(tags) AS t
-           ) && $1::text[]
+           AND tags && $1::text[]
          ORDER BY id DESC
          LIMIT $2 OFFSET $3`,
         [userSkills, limit, offset],
@@ -214,9 +229,7 @@ async function discoverProjects(req, res) {
         `SELECT COUNT(*)::int AS total
          FROM projects
          WHERE status IN ('open', 'bidding')
-           AND (
-             SELECT ARRAY_AGG(LOWER(t)) FROM UNNEST(tags) AS t
-           ) && $1::text[]`,
+           AND tags && $1::text[]`,
         [userSkills],
       ),
     ]);
@@ -410,6 +423,14 @@ async function reviewProject(req, res) {
     ).catch((e) => logger.error("project_events insert error", e));
 
     res.json({ message: `Project ${reviewStatus}`, project: result.rows[0] });
+
+    // Invalidate stats cache — review changes completed_projects / pending_reviews
+    // for the client and approved_projects / completed_projects for the developer.
+    if (proj.assigned_developer_id) {
+      invalidateStatsCache({ clientId: req.user.id, devId: proj.assigned_developer_id }).catch(() => {});
+    } else {
+      invalidateStatsCache({ clientId: req.user.id }).catch(() => {});
+    }
   } catch (err) {
     logger.error("reviewProject error", err);
     res.status(500).json({ message: "Error reviewing project" });

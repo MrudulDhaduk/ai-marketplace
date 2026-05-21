@@ -4,6 +4,7 @@ const { validateBid } = require("../utils/validation");
 const { createNotification } = require("../services/notificationService");
 const { EVENTS, emitTypedEvent } = require("../sockets/socketEvents");
 const { emitToRoomWithAck } = require("../sockets/socketAck");
+const { invalidateStatsCache } = require("./statsController");
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -100,6 +101,10 @@ async function placeBid(req, res) {
     }
 
     res.status(201).json({ message: "Bid placed successfully", bid });
+
+    // Invalidate stats cache — a new bid changes developer pending_bids
+    // and client total_bids counts.
+    invalidateStatsCache({ devId: developerId, clientId: project.client_id }).catch(() => {});
   } catch (err) {
     logger.error("placeBid error", err);
     res.status(500).json({ message: "Error placing bid" });
@@ -277,6 +282,10 @@ async function acceptBid(req, res) {
       assignedDeveloperId: bid.developer_id,
       projectId,
     });
+
+    // Invalidate stats cache — bid acceptance changes active_projects and
+    // accepted_bids for the developer, and active_projects for the client.
+    invalidateStatsCache({ devId: bid.developer_id, clientId: proj.client_id }).catch(() => {});
   } catch (err) {
     await client.query("ROLLBACK");
     logger.error("acceptBid error", err);

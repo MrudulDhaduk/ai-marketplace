@@ -56,43 +56,11 @@ async function getActivity(req, res) {
 
     const offset = (Math.max(1, Number(page)) - 1) * Math.min(100, Number(limit));
 
-    // BUG-C3 fix: the live schema still has the column named approved_at.
-    // Migration 007 renames it to actioned_at but may not have run yet.
-    // Use a CASE expression that works regardless of which column name exists:
-    // we select both names defensively via a subquery on information_schema,
-    // but the simplest safe approach is to alias whichever column is present.
-    // Since we cannot branch SQL at query time without dynamic SQL, we use
-    // a single expression that references only the post-migration name
-    // (actioned_at) but falls back gracefully: if the column doesn't exist
-    // the query would error, so we detect the column name at startup and
-    // cache it, then use the correct alias in the SELECT.
-    //
-    // Practical fix: always reference the column via a COALESCE that tries
-    // both names using a generated column alias — PostgreSQL allows this
-    // only with dynamic SQL. Instead, we detect once per request which
-    // column exists and build the SELECT accordingly.
-    const colCheck = await pool.query(
-      `SELECT column_name
-       FROM information_schema.columns
-       WHERE table_name = 'project_events'
-         AND column_name IN ('actioned_at', 'approved_at')`,
-    );
-    const colNames = colCheck.rows.map((r) => r.column_name);
-    const hasActionedAt = colNames.includes("actioned_at");
-    const hasApprovedAt = colNames.includes("approved_at");
-
-    // Build the timestamp expression based on what actually exists
-    let tsExpr;
-    if (hasActionedAt && hasApprovedAt) {
-      tsExpr = "COALESCE(pe.actioned_at, pe.approved_at)";
-    } else if (hasActionedAt) {
-      tsExpr = "pe.actioned_at";
-    } else if (hasApprovedAt) {
-      tsExpr = "pe.approved_at";
-    } else {
-      tsExpr = "NULL::timestamptz";
-    }
-
+    // Phase 5 — BUG-C3 runtime detection removed.
+    // Migration 007 renamed approved_at → actioned_at and has been confirmed
+    // applied on all environments (verified via schema.sql dump). The
+    // information_schema catalog query that previously ran on every request
+    // is no longer needed. Reference actioned_at directly.
     const result = await pool.query(
       `SELECT
          pe.id,
@@ -105,7 +73,7 @@ async function getActivity(req, res) {
          pe.actor_role,
          pe.approval_status,
          pe.approval_feedback,
-         ${tsExpr} AS actioned_at,
+         pe.actioned_at,
          COALESCE(u.first_name || ' ' || u.last_name, u.username, 'Unknown') AS resolved_actor_name,
          u.role AS resolved_actor_role
        FROM project_events pe
@@ -154,18 +122,10 @@ async function approveEntry(req, res) {
     const access = await verifyProjectAccess(id, req.user.id);
     if (!access || !access.isClient) return res.status(403).json({ message: "Only the client can approve entries" });
 
-    // BUG-C3 fix: detect column name so this works before and after migration 007
-    const colCheck = await pool.query(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_name = 'project_events' AND column_name IN ('actioned_at','approved_at')`,
-    );
-    const tsCol = colCheck.rows.some((r) => r.column_name === "actioned_at")
-      ? "actioned_at"
-      : "approved_at";
-
+    // Phase 5 — BUG-C3 runtime detection removed. actioned_at confirmed stable.
     const result = await pool.query(
       `UPDATE project_events
-       SET approval_status = 'approved', approval_feedback = $1, ${tsCol} = NOW()
+       SET approval_status = 'approved', approval_feedback = $1, actioned_at = NOW()
        WHERE id = $2 AND project_id = $3
        RETURNING *`,
       [feedback?.trim() || null, eventId, id],
@@ -221,18 +181,10 @@ async function requestRevisionOnEntry(req, res) {
     const access = await verifyProjectAccess(id, req.user.id);
     if (!access || !access.isClient) return res.status(403).json({ message: "Only the client can request revisions" });
 
-    // BUG-C3 fix: detect column name so this works before and after migration 007
-    const colCheck = await pool.query(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_name = 'project_events' AND column_name IN ('actioned_at','approved_at')`,
-    );
-    const tsCol = colCheck.rows.some((r) => r.column_name === "actioned_at")
-      ? "actioned_at"
-      : "approved_at";
-
+    // Phase 5 — BUG-C3 runtime detection removed. actioned_at confirmed stable.
     const result = await pool.query(
       `UPDATE project_events
-       SET approval_status = 'revision_requested', approval_feedback = $1, ${tsCol} = NULL
+       SET approval_status = 'revision_requested', approval_feedback = $1, actioned_at = NULL
        WHERE id = $2 AND project_id = $3
        RETURNING *`,
       [feedback?.trim() || null, eventId, id],
@@ -289,22 +241,11 @@ async function resolveEntry(req, res) {
     const access = await verifyProjectAccess(id, req.user.id);
     if (!access) return res.status(403).json({ message: "Unauthorized" });
 
-    // BUG-C4 fix: set actioned_at = NOW() so the resolution timestamp is
-    // recorded. Previously this was NULL which made it impossible to know
-    // when a revision was resolved.
-    // Also handle the approved_at → actioned_at column rename (BUG-C3):
-    // detect which column exists and update the correct one.
-    const colCheck = await pool.query(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_name = 'project_events' AND column_name IN ('actioned_at','approved_at')`,
-    );
-    const tsCol = colCheck.rows.some((r) => r.column_name === "actioned_at")
-      ? "actioned_at"
-      : "approved_at";
-
+    // Phase 5 — BUG-C3/C4 runtime detection removed. actioned_at confirmed stable.
+    // Sets actioned_at = NOW() so the resolution timestamp is recorded.
     const result = await pool.query(
       `UPDATE project_events
-       SET approval_status = 'resolved', ${tsCol} = NOW()
+       SET approval_status = 'resolved', actioned_at = NOW()
        WHERE id = $1 AND project_id = $2
        RETURNING *`,
       [eventId, id],
@@ -312,9 +253,7 @@ async function resolveEntry(req, res) {
 
     if (!result.rows.length) return res.status(404).json({ message: "Event not found" });
 
-    // Include actioned_at in the socket payload so the frontend can update
-    // the timestamp in-place without a full refetch (BUG-C9 partial fix)
-    const actionedAt = result.rows[0][tsCol] || result.rows[0].actioned_at || result.rows[0].approved_at;
+    const actionedAt = result.rows[0].actioned_at;
 
     const seqId = Date.now();
 
