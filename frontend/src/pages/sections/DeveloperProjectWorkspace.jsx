@@ -1,7 +1,8 @@
 import "./ProjectWorkspace.css";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useSocket } from "../../context/SocketContext";
+import { useSocket, useJoinProject, useConnectionState } from "../../context/SocketContext";
 import { useAuth } from "../../context/AuthContext";
+import ConnectionStatusBar from "../../components/ConnectionStatusBar";
 import SubmissionHistory from "./components/SubmissionHistory";
 import React from "react";
 import { apiRequest, API_BASE_URL } from "../../lib/api";
@@ -87,10 +88,10 @@ function DeveloperProjectWorkspace({ project, onBack, onOpenMessages, onComplete
   const [demoLink, setDemoLink] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Phase 3: token is now httpOnly — not accessible to JS.
-  // XHR upload uses withCredentials to send the cookie automatically.
   const { currentUser } = useAuth();
-  const socket = useSocket();
+  const socket      = useSocket();
+  const joinProject = useJoinProject();
+  const { connectionState, reconnectAttempt, onRetry } = useConnectionState();
 
   /* ── Server state via TanStack Query ────────────────────── */
   const { data: projectDetail } = useProjectDetail(project?.id);
@@ -123,48 +124,40 @@ function DeveloperProjectWorkspace({ project, onBack, onOpenMessages, onComplete
   useEffect(() => {
     if (!project?.id) return;
 
-    const handleProjectReviewed = () => {
-      // Invalidate project detail — TanStack Query refetches automatically
-      invalidateProject(project.id);
-      pushNotif("📬 Client left new feedback!", "warning");
+    // Phase 4: typed approval:granted — show feedback notification
+    const handleApprovalGranted = (envelope) => {
+      if (envelope?.projectId !== project.id) return;
+      pushNotif("✅ Client approved your work!", "success");
       setActiveTab("feedback");
-      // Notify parent dashboard
-      if (onProjectUpdated) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.developer.assigned(undefined) });
-        onProjectUpdated({ id: project.id });
-      }
+      if (onProjectUpdated) onProjectUpdated({ id: project.id });
     };
 
-    const handleProjectSubmitted = () => {
-      invalidateProject(project.id);
+    // Phase 4: typed revision:requested — show revision notification
+    const handleRevisionRequested = (envelope) => {
+      if (envelope?.projectId !== project.id) return;
+      pushNotif("📬 Client requested revisions!", "warning");
+      setActiveTab("feedback");
+      if (onProjectUpdated) onProjectUpdated({ id: project.id });
     };
 
-    // BUG-M2 fix: workspace_activity_updated (entry-level approval) also
-    // refreshes review status
-    const handleWorkspaceActivityUpdated = () => {
-      invalidateProject(project.id);
-    };
-
-    // ARCH-8 fix: re-join project room on reconnect
+    // ARCH-8: re-join with lastSeqId on reconnect
     const handleReconnect = () => {
-      socket.emit("join_project", project.id);
+      joinProject(project.id);
     };
 
-    // BUG-C7 fix: register listeners BEFORE emitting join_project
-    socket.on("project_reviewed",           handleProjectReviewed);
-    socket.on("project_submitted",          handleProjectSubmitted);
-    socket.on("workspace_activity_updated", handleWorkspaceActivityUpdated);
-    socket.on("connect",                    handleReconnect);
+    socket.on("approval:granted",   handleApprovalGranted);
+    socket.on("revision:requested", handleRevisionRequested);
+    socket.on("connect",            handleReconnect);
 
-    socket.emit("join_project", project.id);
+    // Join with lastSeqId for missed-event replay
+    joinProject(project.id);
 
     return () => {
-      socket.off("project_reviewed",           handleProjectReviewed);
-      socket.off("project_submitted",          handleProjectSubmitted);
-      socket.off("workspace_activity_updated", handleWorkspaceActivityUpdated);
-      socket.off("connect",                    handleReconnect);
+      socket.off("approval:granted",   handleApprovalGranted);
+      socket.off("revision:requested", handleRevisionRequested);
+      socket.off("connect",            handleReconnect);
     };
-  }, [project?.id, socket, pushNotif, onProjectUpdated]);
+  }, [project?.id, socket, joinProject, pushNotif, onProjectUpdated]);
 
   /* ── file delete ─────────────────────────────────────── */
   const handleDelete = async (id) => {
@@ -329,6 +322,13 @@ function DeveloperProjectWorkspace({ project, onBack, onOpenMessages, onComplete
 
   return (
     <div className="dd-content dd-workspace">
+
+      {/* ── Connection status ── */}
+      <ConnectionStatusBar
+        connectionState={connectionState}
+        reconnectAttempt={reconnectAttempt}
+        onRetry={onRetry}
+      />
 
       {/* ── Floating notification ── */}
       {notification && (

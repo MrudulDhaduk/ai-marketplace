@@ -2,6 +2,8 @@ const pool = require("../config/db");
 const logger = require("../utils/logger");
 const { validateBid } = require("../utils/validation");
 const { createNotification } = require("../services/notificationService");
+const { EVENTS, emitTypedEvent } = require("../sockets/socketEvents");
+const { emitToRoomWithAck } = require("../sockets/socketAck");
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -252,10 +254,23 @@ async function acceptBid(req, res) {
     ).catch((e) => logger.error("project_events insert error", e));
 
     // Emit workspace activity update
-    req.io.to(`project_${projectId}`).emit("workspace_activity_updated", {
-      projectId: Number(projectId),
-      eventType: "bid_accepted",
+    const seqId = Date.now();
+
+    // ── Typed events (Phase 4) — with ack ──────────────────────────────────
+    const envelope = emitTypedEvent(req.io.to(`project_${projectId}`), EVENTS.BID_ACCEPTED, {
+      projectId:  Number(projectId),
+      actorId:    req.user.id,
+      actorName:  actorName,
+      actorRole:  u?.role || "client",
+      seqId,
+      data: {
+        bidId:       Number(bidId),
+        developerId: bid.developer_id,
+        amount:      bid.amount,
+      },
     });
+
+    emitToRoomWithAck(req.io, `project_${projectId}`, EVENTS.BID_ACCEPTED, envelope, { logger });
 
     res.json({
       message: "Bid accepted successfully",

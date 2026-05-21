@@ -2,6 +2,8 @@ const pool = require("../config/db");
 const logger = require("../utils/logger");
 const { validateProject } = require("../utils/validation");
 const { createNotification } = require("../services/notificationService");
+const { EVENTS, emitTypedEvent } = require("../sockets/socketEvents");
+const { emitToRoomWithAck } = require("../sockets/socketAck");
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -362,17 +364,23 @@ async function reviewProject(req, res) {
     const proj = project.rows[0];
 
     // Emit socket event to project room
-    req.io.to(`project_${id}`).emit("project_reviewed", {
-      type: "project_reviewed",
-      projectId: id,
-      reviewStatus,
-      feedback,
-      message: action === "approve" ? "Your project was approved! 🎉" : "Your project needs revision",
+    const seqId = Date.now();
+    const typedEvent = action === "approve" ? EVENTS.APPROVAL_GRANTED : EVENTS.REVISION_REQUESTED;
+
+    // ── Typed events (Phase 4) — with ack ──────────────────────────────────
+    const reviewEnvelope = emitTypedEvent(req.io.to(`project_${id}`), typedEvent, {
+      projectId:  Number(id),
+      actorId:    req.user.id,
+      actorRole:  "client",
+      seqId,
+      data: {
+        reviewStatus,
+        feedback:    feedback?.trim() || null,
+        status:      action === "approve" ? "completed" : undefined,
+      },
     });
-    req.io.to(`project_${id}`).emit("workspace_activity_updated", {
-      projectId: Number(id),
-      eventType,
-    });
+
+    emitToRoomWithAck(req.io, `project_${id}`, typedEvent, reviewEnvelope, { logger });
 
     // Persist notification for developer
     if (proj.assigned_developer_id) {
@@ -452,9 +460,13 @@ async function requestUpdate(req, res) {
       [id, req.user.id, JSON.stringify({ feedback: feedback?.trim() || null }), actorName, u?.role || "client"],
     ).catch((e) => logger.error("project_events insert error", e));
 
-    req.io.to(`project_${id}`).emit("workspace_activity_updated", {
+    emitTypedEvent(req.io.to(`project_${id}`), EVENTS.PROJECT_STATUS_CHANGED, {
       projectId: Number(id),
-      eventType: "update_requested",
+      actorId:   req.user.id,
+      actorName: actorName,
+      actorRole: u?.role || "client",
+      seqId:     Date.now(),
+      data:      { eventType: "update_requested", feedback: feedback?.trim() || null },
     });
 
     res.json({ message: "Update request sent to developer" });
@@ -510,9 +522,13 @@ async function setUrgent(req, res) {
         [id, req.user.id, JSON.stringify({}), actorName, u?.role || "client"],
       ).catch((e) => logger.error("project_events insert error", e));
 
-      req.io.to(`project_${id}`).emit("workspace_activity_updated", {
+      emitTypedEvent(req.io.to(`project_${id}`), EVENTS.PROJECT_URGENT_SET, {
         projectId: Number(id),
-        eventType: "project_urgent",
+        actorId:   req.user.id,
+        actorName: actorName,
+        actorRole: u?.role || "client",
+        seqId:     Date.now(),
+        data:      { isUrgent: true },
       });
     }
 
@@ -532,9 +548,13 @@ async function setUrgent(req, res) {
         [id, req.user.id, JSON.stringify({}), actorName, u?.role || "client"],
       ).catch((e) => logger.error("project_events project_unurgent insert error", e));
 
-      req.io.to(`project_${id}`).emit("workspace_activity_updated", {
+      emitTypedEvent(req.io.to(`project_${id}`), EVENTS.PROJECT_URGENT_CLEARED, {
         projectId: Number(id),
-        eventType: "project_unurgent",
+        actorId:   req.user.id,
+        actorName: actorName,
+        actorRole: u?.role || "client",
+        seqId:     Date.now(),
+        data:      { isUrgent: false },
       });
     }
 

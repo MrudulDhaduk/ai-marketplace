@@ -48,10 +48,13 @@ function ChatPanel({ project, currentUser }) {
   const [messages, setMessages] = useState([]);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
-  const [typing, setTyping] = useState(false);
-  const [typingUser, setTypingUser] = useState("");
+  const [typingUsers, setTypingUsers] = useState(new Map()); // Map<userId, { username, timeoutId }>
   const bottomRef = useRef(null);
-  const typingTimer = useRef(null);
+  const typingDebounceRef = useRef(null);
+  const isTypingRef = useRef(false); // track whether we've emitted typing:started
+
+  const TYPING_DEBOUNCE_MS = 1500;
+  const TYPING_STALE_MS    = 4000; // auto-clear if no typing:stopped received
 
   /* fetch messages on project change */
   useEffect(() => {
@@ -63,53 +66,113 @@ function ChatPanel({ project, currentUser }) {
       .catch(() => {});
   }, [project?.id]);
 
+  /* stop typing on unmount */
+  useEffect(() => {
+    return () => {
+      clearTimeout(typingDebounceRef.current);
+      if (isTypingRef.current) {
+        socket.emit("typing", { projectId: project?.id, typing: false });
+        isTypingRef.current = false;
+      }
+    };
+  }, [project?.id, socket]);
+
   /* join socket room + realtime listeners */
   useEffect(() => {
     if (!project?.id) return;
     socket.emit("join_project", project.id);
 
-    const handleNewMessage = (msg) => {
+    const handleMessageSent = (envelope) => {
+      if (!envelope?.data) return;
+      const d = envelope.data;
       setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
-        return [...prev, msg];
+        if (prev.some((m) => m.id === d.messageId)) return prev;
+        return [...prev, {
+          id:              d.messageId,
+          sender_id:       d.senderId,
+          receiver_id:     d.receiverId,
+          body:            d.body,
+          is_read:         false,
+          created_at:      d.createdAt,
+          sender_username: d.senderUsername,
+        }];
       });
     };
 
-    const handleTyping = ({ userId, username, typing: isTyping }) => {
-      if (userId === currentUser?.id) return;
-      setTyping(isTyping);
-      setTypingUser(isTyping ? username : "");
+    const handleTypingStarted = (envelope) => {
+      if (envelope?.actorId === currentUser?.id) return;
+      updateTypingUser(envelope.actorId, envelope.actorName, true);
     };
 
-    socket.on("new_message", handleNewMessage);
-    socket.on("typing",      handleTyping);
-    return () => {
-      socket.off("new_message", handleNewMessage);
-      socket.off("typing",      handleTyping);
+    const handleTypingStopped = (envelope) => {
+      if (envelope?.actorId === currentUser?.id) return;
+      updateTypingUser(envelope.actorId, envelope.actorName, false);
     };
-  }, [project?.id, currentUser?.id, socket]);
+
+    socket.on("message:sent",   handleMessageSent);
+    socket.on("typing:started", handleTypingStarted);
+    socket.on("typing:stopped", handleTypingStopped);
+
+    return () => {
+      socket.off("message:sent",   handleMessageSent);
+      socket.off("typing:started", handleTypingStarted);
+      socket.off("typing:stopped", handleTypingStopped);
+    };
+  }, [project?.id, currentUser?.id, socket]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function updateTypingUser(userId, username, isTyping) {
+    setTypingUsers((prev) => {
+      const next = new Map(prev);
+      if (isTyping) {
+        // Clear existing stale timeout
+        if (next.has(userId)) clearTimeout(next.get(userId).timeoutId);
+        const timeoutId = setTimeout(() => {
+          setTypingUsers((m) => { const n = new Map(m); n.delete(userId); return n; });
+        }, TYPING_STALE_MS);
+        next.set(userId, { username, timeoutId });
+      } else {
+        if (next.has(userId)) clearTimeout(next.get(userId).timeoutId);
+        next.delete(userId);
+      }
+      return next;
+    });
+  }
 
   /* scroll to bottom on new messages */
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /* typing indicator emit */
+  /* typing indicator emit — leading edge + trailing debounce */
   const handleInputChange = (e) => {
     setBody(e.target.value);
-    socket.emit("typing", { projectId: project.id, typing: true });
-    clearTimeout(typingTimer.current);
-    typingTimer.current = setTimeout(() => {
+
+    // Leading edge: emit typing:started only on first keystroke
+    if (!isTypingRef.current) {
+      socket.emit("typing", { projectId: project.id, typing: true });
+      isTypingRef.current = true;
+    }
+
+    // Reset trailing debounce
+    clearTimeout(typingDebounceRef.current);
+    typingDebounceRef.current = setTimeout(() => {
       socket.emit("typing", { projectId: project.id, typing: false });
-    }, 1500);
+      isTypingRef.current = false;
+    }, TYPING_DEBOUNCE_MS);
   };
 
   const handleSend = async (e) => {
     e.preventDefault();
     if (!body.trim() || sending) return;
     setSending(true);
-    clearTimeout(typingTimer.current);
-    socket.emit("typing", { projectId: project.id, typing: false });
+
+    // Stop typing immediately on send
+    clearTimeout(typingDebounceRef.current);
+    if (isTypingRef.current) {
+      socket.emit("typing", { projectId: project.id, typing: false });
+      isTypingRef.current = false;
+    }
+
     try {
       const r = await apiRequest(`/projects/${project.id}/messages`, {
         method: "POST",
@@ -126,6 +189,8 @@ function ChatPanel({ project, currentUser }) {
     } catch {}
     setSending(false);
   };
+
+  const typingList = Array.from(typingUsers.values());
 
   return (
     <div className="msg-chat">
@@ -157,10 +222,13 @@ function ChatPanel({ project, currentUser }) {
             </div>
           );
         })}
-        {typing && (
+        {typingList.length > 0 && (
           <div className="msg-typing">
             <span className="msg-typing-dots"><span /><span /><span /></span>
-            <span className="msg-typing-label">{typingUser} is typing…</span>
+            <span className="msg-typing-label">
+              {typingList.map((u) => u.username).join(", ")}
+              {typingList.length === 1 ? " is" : " are"} typing…
+            </span>
           </div>
         )}
         <div ref={bottomRef} />

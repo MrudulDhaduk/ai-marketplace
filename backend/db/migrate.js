@@ -44,6 +44,7 @@ const MIGRATION_FILES = [
   "007_schema_stabilization.sql",
   "008_email_verification.sql",
   "009_refresh_tokens.sql",
+  "010_phase4_realtime.sql",
 ];
 
 async function runMigrations() {

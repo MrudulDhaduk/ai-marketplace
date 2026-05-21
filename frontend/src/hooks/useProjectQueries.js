@@ -209,7 +209,10 @@ export function useClientStats() {
   return useQuery({
     queryKey: queryKeys.client.stats(),
     queryFn: () => fetchJson("/api/stats/client"),
-    staleTime: 60 * 1000, // stats can be slightly stale
+    staleTime: 60 * 1000,
+    // Stats are aggregates — can't be derived from socket payloads alone.
+    // Refetch on reconnect to recover any missed aggregate changes.
+    refetchOnReconnect: true,
   });
 }
 
@@ -218,6 +221,7 @@ export function useDeveloperStats() {
     queryKey: queryKeys.developer.stats(),
     queryFn: () => fetchJson("/api/stats/developer"),
     staleTime: 60 * 1000,
+    refetchOnReconnect: true,
   });
 }
 
@@ -267,7 +271,6 @@ export function useNotifications(userId) {
 
 /**
  * Invalidate all queries related to a specific project.
- * Use this in socket handlers: project_submitted, project_reviewed, etc.
  */
 export function invalidateProject(projectId) {
   queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(projectId) });
@@ -284,7 +287,7 @@ export function invalidateProjectFiles(projectId) {
 }
 
 /**
- * Invalidate project activity only (for workspace_activity_updated).
+ * Invalidate project activity only.
  */
 export function invalidateProjectActivity(projectId) {
   // Invalidate all activity queries for this project regardless of filter

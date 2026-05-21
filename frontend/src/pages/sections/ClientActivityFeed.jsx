@@ -44,21 +44,24 @@ export default function ClientActivityFeed() {
   const socket = useSocket();
   const { data: feed = [], isLoading: loading } = useClientActivity();
 
-  /* Invalidate the cached activity query when relevant socket events fire.
-     TanStack Query handles the actual refetch — no manual fetch() needed. */
+  /* Invalidate the cached activity query when typed socket events fire. */
   useEffect(() => {
     const invalidate = () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.client.activity() });
     };
 
-    socket.on("notification",      invalidate);
-    socket.on("project_submitted", invalidate);
-    socket.on("project_reviewed",  invalidate);
+    socket.on("submission:created",  invalidate);
+    socket.on("approval:granted",    invalidate);
+    socket.on("revision:requested",  invalidate);
+    socket.on("bid:accepted",        invalidate);
+    socket.on("notification:received", invalidate);
 
     return () => {
-      socket.off("notification",      invalidate);
-      socket.off("project_submitted", invalidate);
-      socket.off("project_reviewed",  invalidate);
+      socket.off("submission:created",   invalidate);
+      socket.off("approval:granted",     invalidate);
+      socket.off("revision:requested",   invalidate);
+      socket.off("bid:accepted",         invalidate);
+      socket.off("notification:received", invalidate);
     };
   }, [socket]);
 

@@ -3,6 +3,7 @@ const pool = require("../config/db");
 const { upload } = require("../services/uploadService");
 const storageService = require("../services/storageService");
 const logger = require("../utils/logger");
+const { EVENTS, emitTypedEvent } = require("../sockets/socketEvents");
 
 /** POST /projects/:id/upload */
 function uploadFiles(req, res) {
@@ -101,9 +102,13 @@ function uploadFiles(req, res) {
           );
 
           // Emit realtime update to project room
-          req.io.to(`project_${id}`).emit("workspace_activity_updated", {
+          emitTypedEvent(req.io.to(`project_${id}`), EVENTS.PROJECT_STATUS_CHANGED, {
             projectId: Number(id),
-            eventType: "file_uploaded",
+            actorId:   req.user.id,
+            actorName: actorName,
+            actorRole: u?.role || "developer",
+            seqId:     Date.now(),
+            data:      { eventType: "file_uploaded", count: insertedRows.length },
           });
         } catch (evtErr) {
           logger.error("file_uploaded event insert error", evtErr);
@@ -182,8 +187,8 @@ async function deleteFile(req, res) {
 
     await pool.query("DELETE FROM project_files WHERE id = $1", [id]);
 
-    // ARCH-9 fix: record a file_deleted event and emit workspace_activity_updated
-    // so the client's file list and activity feed update in realtime.
+    // Record a file_deleted event and emit typed socket event so the
+    // client's file list and activity feed update in realtime.
     try {
       const userRes = await pool.query(
         "SELECT first_name, last_name, username, role FROM users WHERE id = $1",
@@ -198,9 +203,13 @@ async function deleteFile(req, res) {
         [project_id, req.user.id, JSON.stringify({ file: file_name }), actorName, u?.role || "developer"],
       );
 
-      req.io.to(`project_${project_id}`).emit("workspace_activity_updated", {
+      emitTypedEvent(req.io.to(`project_${project_id}`), EVENTS.PROJECT_STATUS_CHANGED, {
         projectId: Number(project_id),
-        eventType: "file_deleted",
+        actorId:   req.user.id,
+        actorName: actorName,
+        actorRole: u?.role || "developer",
+        seqId:     Date.now(),
+        data:      { eventType: "file_deleted", file: file_name },
       });
     } catch (evtErr) {
       logger.error("file_deleted event insert error", evtErr);
@@ -265,12 +274,14 @@ async function reorderFiles(req, res) {
       client.release();
     }
 
-    // ARCH-10 fix: emit a socket event so the client's file list order updates
-    // in realtime when the developer reorders files.
+    // Emit socket event so the client's file list order updates in realtime.
     if (projectId) {
-      req.io.to(`project_${projectId}`).emit("workspace_activity_updated", {
+      emitTypedEvent(req.io.to(`project_${projectId}`), EVENTS.PROJECT_STATUS_CHANGED, {
         projectId: Number(projectId),
-        eventType: "files_reordered",
+        actorId:   req.user.id,
+        actorRole: "developer",
+        seqId:     Date.now(),
+        data:      { eventType: "files_reordered" },
       });
     }
 

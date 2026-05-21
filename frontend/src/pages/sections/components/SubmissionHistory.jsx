@@ -325,15 +325,10 @@ export default React.memo(function SubmissionHistory({ projectId, isClient = fal
   useEffect(() => {
     if (!projectId) return;
 
-    const handleHistoryUpdated = () => {
-      refetchHistory();
-      invalidateProjectActivity(projectId);
-    };
-    const handleActivityUpdated = () => {
-      invalidateProjectActivity(projectId);
-    };
+    // comment:added — bump comment count in cache for the active filter view.
+    // SocketContext handles this globally across all filters; this handler
+    // keeps the currently-visible filter in sync immediately.
     const handleCommentAdded = ({ eventId }) => {
-      // Optimistically bump comment count in cache
       queryClient.setQueryData(
         queryKeys.projects.activity(projectId, activeFilter),
         (prev = []) =>
@@ -344,38 +339,13 @@ export default React.memo(function SubmissionHistory({ projectId, isClient = fal
           ),
       );
     };
-    const handleEntryUpdatedSocket = ({ eventId, approval_status, approval_feedback, actioned_at }) => {
-      // Update all activity filter variants in cache
-      ["all", "submissions", "files", "reviews", "system"].forEach((filter) => {
-        queryClient.setQueryData(
-          queryKeys.projects.activity(projectId, filter),
-          (prev = []) =>
-            prev.map((e) =>
-              e.id === eventId
-                ? {
-                    ...e,
-                    approval_status,
-                    approval_feedback: approval_feedback ?? e.approval_feedback,
-                    actioned_at: actioned_at ?? e.actioned_at,
-                  }
-                : e,
-            ),
-        );
-      });
-    };
 
-    socket.on("submission_history_updated", handleHistoryUpdated);
-    socket.on("workspace_activity_updated", handleActivityUpdated);
-    socket.on("activity_comment_added",     handleCommentAdded);
-    socket.on("activity_entry_updated",     handleEntryUpdatedSocket);
+    socket.on("comment:added", handleCommentAdded);
 
     return () => {
-      socket.off("submission_history_updated", handleHistoryUpdated);
-      socket.off("workspace_activity_updated", handleActivityUpdated);
-      socket.off("activity_comment_added",     handleCommentAdded);
-      socket.off("activity_entry_updated",     handleEntryUpdatedSocket);
+      socket.off("comment:added", handleCommentAdded);
     };
-  }, [projectId, socket, activeFilter, refetchHistory]);
+  }, [projectId, socket, activeFilter]);
 
   /* ── group activity by date ── */
   const groupedActivity = useMemo(() => {

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import "./ProjectWorkspace.css";
-import { useSocket } from "../../context/SocketContext";
+import { useSocket, useJoinProject, useConnectionState } from "../../context/SocketContext";
+import ConnectionStatusBar from "../../components/ConnectionStatusBar";
 import SubmissionHistory from "./components/SubmissionHistory";
 import { apiRequest, API_BASE_URL } from "../../lib/api";
 import { queryClient } from "../../lib/queryClient";
@@ -167,7 +168,9 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
   const [hasNewUpdate,        setHasNewUpdate]        = useState(false);
   const [reviewHistory,       setReviewHistory]       = useState([]);
 
-  const socket = useSocket();
+  const socket    = useSocket();
+  const joinProject = useJoinProject();
+  const { connectionState, reconnectAttempt, onRetry } = useConnectionState();
 
   /* ── Server state via TanStack Query ────────────────────── */
   const { data: projectDetail, isLoading: loadingDeliverables } = useProjectDetail(project?.id);
@@ -206,53 +209,29 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
   useEffect(() => {
     if (!project?.id) return;
 
-    const handleProjectSubmitted = async () => {
-      // Invalidate project detail + files — TanStack Query handles the refetch
-      invalidateProject(project.id);
-      setHasNewUpdate(true);
-    };
-
-    const handleProjectReviewed = () => {
-      invalidateProject(project.id);
-    };
-
-    // ARCH-9/10 fix: refresh the file list when the developer deletes or
-    // reorders files so the client sees the change in realtime.
-    const handleWorkspaceActivityUpdated = ({ eventType } = {}) => {
-      if (
-        eventType === "file_deleted" ||
-        eventType === "files_reordered" ||
-        eventType === "file_uploaded"
-      ) {
-        invalidateProjectFiles(project.id);
+    // Phase 4: typed submission:created — show "new update" banner
+    const handleSubmissionCreated = (envelope) => {
+      if (envelope?.projectId === project.id) {
+        setHasNewUpdate(true);
       }
-      // Always invalidate activity feed
-      queryClient.invalidateQueries({
-        queryKey: ["projects", "activity", project.id],
-        exact: false,
-      });
     };
 
-    // ARCH-8 fix: re-join the project room on socket reconnect
+    // ARCH-8: re-join with lastSeqId on reconnect for missed-event replay
     const handleReconnect = () => {
-      socket.emit("join_project", project.id);
+      joinProject(project.id);
     };
 
-    // BUG-C7 fix: register listeners BEFORE emitting join_project
-    socket.on("project_submitted",          handleProjectSubmitted);
-    socket.on("project_reviewed",           handleProjectReviewed);
-    socket.on("workspace_activity_updated", handleWorkspaceActivityUpdated);
-    socket.on("connect",                    handleReconnect);
+    socket.on("submission:created", handleSubmissionCreated);
+    socket.on("connect",            handleReconnect);
 
-    socket.emit("join_project", project.id);
+    // Join with lastSeqId so server can replay missed events
+    joinProject(project.id);
 
     return () => {
-      socket.off("project_submitted",          handleProjectSubmitted);
-      socket.off("project_reviewed",           handleProjectReviewed);
-      socket.off("workspace_activity_updated", handleWorkspaceActivityUpdated);
-      socket.off("connect",                    handleReconnect);
+      socket.off("submission:created", handleSubmissionCreated);
+      socket.off("connect",            handleReconnect);
     };
-  }, [project?.id, socket]);
+  }, [project?.id, socket, joinProject]);
 
   /* ── review submit ──────────────────────────────────────── */
   const handleSubmitReview = async (action) => {
@@ -371,6 +350,13 @@ export default function ClientProjectWorkspace({ project, onBack, onNavigateToMe
   ══════════════════════════════════════════════════════════ */
   return (
     <div className="dd-content dd-workspace cpw-root">
+
+      {/* ── CONNECTION STATUS ──────────────────────────────── */}
+      <ConnectionStatusBar
+        connectionState={connectionState}
+        reconnectAttempt={reconnectAttempt}
+        onRetry={onRetry}
+      />
 
       {/* ── CONFIRM MODAL ─────────────────────────────────── */}
       {showApproveConfirm && (

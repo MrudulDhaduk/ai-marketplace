@@ -100,13 +100,15 @@ export default function TopBar({
     if (!user) return;
 
     // New notification arrives → prepend optimistically + invalidate cache
+    // Handles both legacy "notification" and typed "notification:received"
     const handleNotification = (notif) => {
+      // Typed envelope has { v, data: notifObj } — unwrap if needed
+      const n = notif?.v === 1 ? notif : notif;
       setLocalNotifs((prev) => {
         const base = prev ?? notifications;
-        if (base.some((n) => n.id === notif.id)) return base;
-        return [notif, ...base];
+        if (base.some((x) => x.id === n.id)) return base;
+        return [n, ...base];
       });
-      // Also invalidate so the query cache stays in sync
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
     };
 
@@ -115,12 +117,14 @@ export default function TopBar({
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.list() });
     };
 
-    socket.on("notification", handleNotification);
-    socket.on("connect",      onConnect);
+    socket.on("notification",          handleNotification);
+    socket.on("notification:received", handleNotification);
+    socket.on("connect",               onConnect);
 
     return () => {
-      socket.off("notification", handleNotification);
-      socket.off("connect",      onConnect);
+      socket.off("notification",          handleNotification);
+      socket.off("notification:received", handleNotification);
+      socket.off("connect",               onConnect);
     };
   }, [user, notifications, socket]);
   useEffect(() => {

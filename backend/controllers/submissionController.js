@@ -2,6 +2,8 @@ const pool = require("../config/db");
 const logger = require("../utils/logger");
 const { validateSubmission, isNonEmptyString } = require("../utils/validation");
 const { createNotification } = require("../services/notificationService");
+const { EVENTS, emitTypedEvent } = require("../sockets/socketEvents");
+const { emitToRoomWithAck } = require("../sockets/socketAck");
 
 /** POST /projects/:id/submit */
 async function submitProject(req, res) {
@@ -86,16 +88,26 @@ async function submitProject(req, res) {
     await client.query("COMMIT");
 
     // FIX #2 — emit sockets AFTER commit so activity feed is consistent
-    req.io.to(`project_${id}`).emit("project_submitted", {
-      type: "project_submitted",
-      projectId: id,
-      message: "Project deliverables submitted for review",
+    const seqId = Date.now();
+
+    // ── Typed events (Phase 4) — with ack for critical delivery ───────────
+    const envelope = emitTypedEvent(req.io.to(`project_${id}`), EVENTS.SUBMISSION_CREATED, {
+      projectId:  Number(id),
+      actorId:    req.user.id,
+      actorName:  actorName,
+      actorRole:  u?.role || "developer",
+      seqId,
+      data: {
+        repoLink:    repoLink.trim(),
+        demoLink:    demoLink?.trim() || null,
+        notes:       notes?.trim() || null,
+        submittedAt: new Date().toISOString(),
+        reviewStatus: "pending",
+      },
     });
-    req.io.to(`project_${id}`).emit("submission_history_updated");
-    req.io.to(`project_${id}`).emit("workspace_activity_updated", {
-      projectId: Number(id),
-      eventType: "submission_added",
-    });
+
+    // Ack: re-emit with ack callback to each individual socket in the room
+    emitToRoomWithAck(req.io, `project_${id}`, EVENTS.SUBMISSION_CREATED, envelope, { logger });
 
     // Notify client
     if (proj.client_id) {
@@ -200,10 +212,20 @@ async function addSubmissionNote(req, res) {
     ).catch((e) => logger.error("project_events note_added insert error", e));
 
     // Emit AFTER the DB write so listeners see consistent data
-    req.io.to(`project_${projectId}`).emit("submission_history_updated");
-    req.io.to(`project_${projectId}`).emit("workspace_activity_updated", {
-      projectId: Number(projectId),
-      eventType: "note_added",
+    const seqId = Date.now();
+
+    // ── Typed events (Phase 4) ──────────────────────────────────────────────
+    emitTypedEvent(req.io.to(`project_${projectId}`), EVENTS.SUBMISSION_NOTE_ADDED, {
+      projectId:  Number(projectId),
+      actorId:    userId,
+      actorName:  actorName,
+      actorRole:  u?.role || "developer",
+      seqId,
+      data: {
+        submissionId: result.rows[0].id,
+        notes:        notes.trim(),
+        createdAt:    result.rows[0].submitted_at || new Date().toISOString(),
+      },
     });
 
     res.status(201).json({ success: true, data: result.rows[0] });
@@ -246,7 +268,14 @@ async function updateSubmission(req, res) {
 
     if (!result.rows.length) return res.status(404).json({ message: "Submission not found" });
 
-    req.io.to(`project_${projectId}`).emit("submission_history_updated");
+    // ── Typed events (Phase 4) ──────────────────────────────────────────────
+    emitTypedEvent(req.io.to(`project_${projectId}`), EVENTS.SUBMISSION_NOTE_UPDATED, {
+      projectId:  Number(projectId),
+      actorId:    userId,
+      actorRole:  "developer",
+      seqId:      Date.now(),
+      data: { submissionId: Number(id), notes: notes.trim() },
+    });
 
     res.json({ success: true });
   } catch (err) {
@@ -282,7 +311,14 @@ async function deleteSubmission(req, res) {
 
     if (!result.rows.length) return res.status(404).json({ message: "Submission not found" });
 
-    req.io.to(`project_${projectId}`).emit("submission_history_updated");
+    // ── Typed events (Phase 4) ──────────────────────────────────────────────
+    emitTypedEvent(req.io.to(`project_${projectId}`), EVENTS.SUBMISSION_NOTE_DELETED, {
+      projectId:  Number(projectId),
+      actorId:    userId,
+      actorRole:  "developer",
+      seqId:      Date.now(),
+      data: { submissionId: Number(id) },
+    });
 
     res.json({ success: true });
   } catch (err) {

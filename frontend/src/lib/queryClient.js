@@ -20,12 +20,16 @@ export const queryClient = new QueryClient({
       // Retry failed requests once before surfacing the error.
       retry: 1,
 
-      // Do not refetch on window focus by default — socket events handle
-      // realtime freshness. Individual queries can override this.
+      // Do not refetch on window focus — socket events handle realtime freshness.
       refetchOnWindowFocus: false,
 
-      // Refetch on reconnect so stale data is recovered after a network blip.
-      refetchOnReconnect: true,
+      // Phase 4: set to false — reconnect recovery is now handled by the
+      // missed-event replay system (join_project with lastSeqId → system:replay_batch).
+      // Keeping this true would cause a reconnect storm (all mounted queries
+      // refetch simultaneously after a server restart).
+      // Individual queries that genuinely need reconnect refetch (e.g. stats)
+      // override this with refetchOnReconnect: true in their useQuery config.
+      refetchOnReconnect: false,
     },
     mutations: {
       // Surface mutation errors to the component — no silent swallowing.

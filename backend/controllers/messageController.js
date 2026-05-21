@@ -1,6 +1,7 @@
 const pool = require("../config/db");
 const logger = require("../utils/logger");
 const { createNotification } = require("../services/notificationService");
+const { EVENTS, emitTypedEvent } = require("../sockets/socketEvents");
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
@@ -115,9 +116,24 @@ async function sendMessage(req, res) {
     const message = result.rows[0];
 
     // Emit real-time event to the project room
-    req.io.to(`project_${projectId}`).emit("new_message", {
-      ...message,
-      sender_username: req.user.username,
+    const seqId = Date.now();
+
+    // ── Typed events (Phase 4) ──────────────────────────────────────────────
+    emitTypedEvent(req.io.to(`project_${projectId}`), EVENTS.MESSAGE_SENT, {
+      projectId:  Number(projectId),
+      actorId:    senderId,
+      actorName:  req.user.username,
+      actorRole:  isClient ? "client" : "developer",
+      seqId,
+      data: {
+        messageId:      message.id,
+        body:           message.body,
+        senderId:       message.sender_id,
+        receiverId:     message.receiver_id,
+        senderUsername: req.user.username,
+        isRead:         false,
+        createdAt:      message.created_at,
+      },
     });
 
     // Emit typing-stopped to clear indicator

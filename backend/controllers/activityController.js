@@ -15,6 +15,8 @@
 const pool   = require("../config/db");
 const logger = require("../utils/logger");
 const { createNotification } = require("../services/notificationService");
+const { EVENTS, emitTypedEvent } = require("../sockets/socketEvents");
+const { emitToRoomWithAck } = require("../sockets/socketAck");
 
 /* ─── helpers ──────────────────────────────────────────────────────────────── */
 
@@ -187,11 +189,21 @@ async function approveEntry(req, res) {
       });
     }
 
-    req.io.to(`project_${id}`).emit("activity_entry_updated", {
-      eventId: Number(eventId),
-      approval_status: "approved",
-      approval_feedback: feedback?.trim() || null,
+    // ── Typed events (Phase 4) — with ack ──────────────────────────────────
+    const approvalEnvelope = emitTypedEvent(req.io.to(`project_${id}`), EVENTS.APPROVAL_GRANTED, {
+      projectId:  Number(id),
+      actorId:    req.user.id,
+      actorRole:  "client",
+      seqId,
+      data: {
+        eventId:          Number(eventId),
+        approvalStatus:   "approved",
+        approvalFeedback: feedback?.trim() || null,
+        actionedAt:       new Date().toISOString(),
+      },
     });
+
+    emitToRoomWithAck(req.io, `project_${id}`, EVENTS.APPROVAL_GRANTED, approvalEnvelope, { logger });
 
     res.json({ success: true, event: result.rows[0] });
   } catch (err) {
@@ -244,11 +256,23 @@ async function requestRevisionOnEntry(req, res) {
       });
     }
 
-    req.io.to(`project_${id}`).emit("activity_entry_updated", {
-      eventId: Number(eventId),
-      approval_status: "revision_requested",
-      approval_feedback: feedback?.trim() || null,
+    const seqId = Date.now();
+
+    // ── Typed events (Phase 4) — with ack ──────────────────────────────────
+    const revisionEnvelope = emitTypedEvent(req.io.to(`project_${id}`), EVENTS.REVISION_REQUESTED, {
+      projectId:  Number(id),
+      actorId:    req.user.id,
+      actorRole:  "client",
+      seqId,
+      data: {
+        eventId:          Number(eventId),
+        approvalStatus:   "revision_requested",
+        approvalFeedback: feedback?.trim() || null,
+        actionedAt:       null,
+      },
     });
+
+    emitToRoomWithAck(req.io, `project_${id}`, EVENTS.REVISION_REQUESTED, revisionEnvelope, { logger });
 
     res.json({ success: true, event: result.rows[0] });
   } catch (err) {
@@ -292,10 +316,18 @@ async function resolveEntry(req, res) {
     // the timestamp in-place without a full refetch (BUG-C9 partial fix)
     const actionedAt = result.rows[0][tsCol] || result.rows[0].actioned_at || result.rows[0].approved_at;
 
-    req.io.to(`project_${id}`).emit("activity_entry_updated", {
-      eventId: Number(eventId),
-      approval_status: "resolved",
-      actioned_at: actionedAt,
+    const seqId = Date.now();
+
+    // ── Typed events (Phase 4) ──────────────────────────────────────────────
+    emitTypedEvent(req.io.to(`project_${id}`), EVENTS.REVISION_RESOLVED, {
+      projectId:  Number(id),
+      actorId:    req.user.id,
+      seqId,
+      data: {
+        eventId:        Number(eventId),
+        approvalStatus: "resolved",
+        actionedAt:     actionedAt,
+      },
     });
 
     res.json({ success: true, event: result.rows[0] });
@@ -347,9 +379,16 @@ async function addComment(req, res) {
 
     const comment = result.rows[0];
 
-    req.io.to(`project_${id}`).emit("activity_comment_added", {
-      eventId: Number(eventId),
-      comment,
+    const seqId = Date.now();
+
+    // ── Typed events (Phase 4) ──────────────────────────────────────────────
+    emitTypedEvent(req.io.to(`project_${id}`), EVENTS.COMMENT_ADDED, {
+      projectId:  Number(id),
+      actorId:    req.user.id,
+      actorName:  actorName,
+      actorRole:  req.user.role,
+      seqId,
+      data: { eventId: Number(eventId), comment },
     });
 
     res.status(201).json({ success: true, comment });
