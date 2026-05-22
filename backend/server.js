@@ -128,8 +128,11 @@ process.on("uncaughtException", (err) => {
 });
 
 if (require.main === module) {
-  server.listen(config.port, () => {
-    logger.info("Server running", { port: config.port, env: config.nodeEnv });
+  server.listen(config.port, "0.0.0.0", () => {
+    logger.info("Server running", {
+      port: config.port,
+      env: config.nodeEnv,
+    });
   });
 }
 
