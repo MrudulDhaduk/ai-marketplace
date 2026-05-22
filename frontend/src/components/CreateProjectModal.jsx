@@ -1,6 +1,7 @@
 import "./CreateProjectModal.css";
 import { useState, useEffect, useRef } from "react";
 import { apiRequest } from "../lib/api";
+import { useCallback } from "react";
 /* ── Floating label field ─────────────────────────────────────── */
 function Field({ label, id, children, error, className = "" }) {
   return (
@@ -65,6 +66,11 @@ const CreateProjectModal = ({ onClose, onCreate, project, bids: propBids = [] })
     return () => clearTimeout(t);
   }, []);
 
+    const handleClose = useCallback(() => {
+    setClosing(true);
+    setTimeout(onClose, 260);
+  }, [onClose]);
+
   /* Escape key */
   useEffect(() => {
     const fn = (e) => {
@@ -72,13 +78,10 @@ const CreateProjectModal = ({ onClose, onCreate, project, bids: propBids = [] })
     };
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
-  }, []);
+  }, [handleClose]);
 
   /* Animated close — plays out-animation then calls onClose */
-  const handleClose = () => {
-    setClosing(true);
-    setTimeout(onClose, 260);
-  };
+
 
   const addTag = (rawTag) => {
     const nextTag = rawTag.trim();
