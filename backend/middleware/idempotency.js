@@ -120,3 +120,13 @@ function idempotency({ required = false } = {}) {
 }
 
 module.exports = { idempotency };
+
+// ── Test helper ───────────────────────────────────────────────────────────────
+// Clears the in-memory store between test suites so cached responses from one
+// suite don't bleed into the next. Only used in test environments.
+/* istanbul ignore next */
+function clearStoreForTesting() {
+  memoryStore.clear();
+}
+
+module.exports = { idempotency, clearStoreForTesting };

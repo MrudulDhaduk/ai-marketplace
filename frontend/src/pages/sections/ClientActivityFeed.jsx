@@ -3,6 +3,7 @@ import { useSocket } from "../../context/SocketContext";
 import { useClientActivity } from "../../hooks/useProjectQueries";
 import { queryClient } from "../../lib/queryClient";
 import { queryKeys } from "../../lib/queryKeys";
+import { timeAgo } from "../../utils/time";
 
 /* ── event type → dot colour + label ─────────────── */
 const EVENT_META = {
@@ -13,17 +14,6 @@ const EVENT_META = {
   revision_requested: { dot: "gold", label: "Revision requested" },
   project_approved: { dot: "cyan",   label: "Project approved" },
 };
-
-function timeAgo(dateStr) {
-  if (!dateStr) return "";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
 
 function buildText(event) {
   const meta = EVENT_META[event.event_type] || { label: event.event_type };

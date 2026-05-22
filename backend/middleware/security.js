@@ -9,6 +9,15 @@ const config = require("../config/env");
 const { redisClient, REDIS_ENABLED } = require("../config/redis");
 const logger = require("../utils/logger");
 
+// ipKeyGenerator is available in express-rate-limit v7+ for IPv6-safe key generation.
+// Fall back to a no-op if the version doesn't export it (older installs).
+let ipKeyGenerator;
+try {
+  ipKeyGenerator = require("express-rate-limit").ipKeyGenerator;
+} catch {
+  ipKeyGenerator = null;
+}
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin || config.cors.origins.includes(origin)) return callback(null, true);
@@ -61,14 +70,15 @@ const resendLimiter = rateLimit({
   store: makeStore("resend"),
   // Skip all limits in test mode
   skip: skipInTestMode,
-  // Key by the normalised email from the body, fall back to IP
-  // ipKeyGenerator helper is required by express-rate-limit v8 for IPv6 safety
+  // Key by the normalised email from the body, fall back to IP.
+  // When ipKeyGenerator is available (express-rate-limit v8+), use it for
+  // IPv6-safe IP normalisation. Otherwise fall back to manual ::ffff: stripping.
   keyGenerator(req) {
     const email = req.body?.email;
     if (email && typeof email === "string") {
       return `email:${email.trim().toLowerCase()}`;
     }
-    // Normalise IPv6 ::ffff:x.x.x.x to plain IPv4 to avoid bypass via address format
+    if (ipKeyGenerator) return `ip:${ipKeyGenerator(req)}`;
     const ip = (req.ip || "").replace(/^::ffff:/, "");
     return `ip:${ip}`;
   },
