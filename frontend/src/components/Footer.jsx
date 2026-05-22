@@ -12,9 +12,9 @@ function Footer() {
           <div className="logo">NeuralForge</div>
           <p>The marketplace where AI ambition meets expert execution.</p>
           <div className="social-links">
-            <a className="social-btn" href="#" aria-label="X / Twitter">𝕏</a>
-            <a className="social-btn" href="#" aria-label="LinkedIn">in</a>
-            <a className="social-btn" href="#" aria-label="GitHub">gh</a>
+            <a className="social-btn" href="/" aria-label="X / Twitter">𝕏</a>
+            <a className="social-btn" href="https://www.linkedin.com/in/mrudul-dhaduk-ba9697306/" aria-label="LinkedIn">in</a>
+            <a className="social-btn" href="/" aria-label="GitHub">gh</a>
           </div>
         </div>
 
@@ -24,7 +24,7 @@ function Footer() {
             <ul>
               {links.map((link) => (
                 <li key={link}>
-                  <a href="#">{link}</a>
+                  <a href="/">{link}</a>
                 </li>
               ))}
             </ul>

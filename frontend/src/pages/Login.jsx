@@ -26,7 +26,7 @@ function AuthInput({ field, value, onChange, onFocus, onBlur, focused, errors })
           {field.label}
         </label>
         {field.name === 'password' && (
-          <a href="#" className="auth-forgot">Forgot password?</a>
+          <a href="/" className="auth-forgot">Forgot password?</a>
         )}
       </div>
 
