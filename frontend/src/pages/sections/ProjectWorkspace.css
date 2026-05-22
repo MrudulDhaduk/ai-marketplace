@@ -2180,3 +2180,76 @@ textarea.dd-input {
 
   .cpw-modal { padding: 22px 20px; }
 }
+
+/* ── MobileWorkspaceNav ─────────────────────────────────────── */
+.dd-mobile-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .dd-mobile-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--surface-1, #1a1a2e);
+    border-top: 1px solid var(--border, rgba(255,255,255,0.08));
+    padding: 0;
+    height: 56px;
+  }
+
+  .dd-mobile-nav-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    color: var(--text-2, rgba(255,255,255,0.5));
+    font-size: 10px;
+    cursor: pointer;
+    position: relative;
+    padding: 6px 4px;
+    min-height: 44px;
+    transition: color 0.15s;
+  }
+
+  .dd-mobile-nav-tab--active {
+    color: var(--cyan, #00d4ff);
+  }
+
+  .dd-mobile-nav-badge {
+    position: absolute;
+    top: 4px;
+    right: calc(50% - 18px);
+    background: var(--violet, #7c3aed);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    border-radius: 8px;
+    padding: 1px 4px;
+    min-width: 14px;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .dd-mobile-nav-dot {
+    position: absolute;
+    top: 6px;
+    right: calc(50% - 16px);
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--cyan, #00d4ff);
+  }
+
+  /* Add bottom padding to workspace body so content isn't hidden behind nav */
+  .dd-workspace.cpw-root,
+  .dd-content.dd-workspace {
+    padding-bottom: 64px;
+  }
+}

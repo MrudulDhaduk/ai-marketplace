@@ -19,7 +19,7 @@ async function submitProject(req, res) {
 
     // FIX #7 — lock row and check both ownership AND review_status
     const projectCheck = await client.query(
-      "SELECT assigned_developer_id, review_status, client_id, title FROM projects WHERE id = $1 FOR UPDATE",
+      "SELECT assigned_developer_id, review_status, submitted_at, client_id, title FROM projects WHERE id = $1 FOR UPDATE",
       [id],
     );
 
@@ -35,8 +35,10 @@ async function submitProject(req, res) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    // FIX #7 — backend guard: block resubmit while already under review
-    if (proj.review_status === "pending") {
+    // FIX #7 — backend guard: block resubmit while already under review.
+    // Only applies when a submission has already been made (submitted_at IS NOT NULL).
+    // A brand-new project has review_status = 'pending' by default but no submission yet.
+    if (proj.review_status === "pending" && proj.submitted_at !== null) {
       await client.query("ROLLBACK");
       return res.status(409).json({ message: "A submission is already under review. Wait for client feedback before resubmitting." });
     }

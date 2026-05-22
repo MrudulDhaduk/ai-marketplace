@@ -13,7 +13,7 @@ concurrency:
 jobs:
   # ── Backend ──────────────────────────────────────────────────────────────────
   backend:
-    name: Backend — lint & syntax check
+    name: Backend — lint, migrate & test
     runs-on: ubuntu-latest
 
     services:
@@ -33,11 +33,18 @@ jobs:
 
     env:
       NODE_ENV: test
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_marketplace_test
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ai_marketplace_test
-      JWT_SECRET: ci-test-secret-not-used-in-production
+      JWT_SECRET: ci-test-secret-32-chars-minimum-ok
+      CSRF_SECRET: ci-csrf-secret-32-chars-minimum-ok
+      REFRESH_TOKEN_SECRET: ci-refresh-secret-32-chars-min-ok
+      JWT_EXPIRES_IN: "15m"
+      REFRESH_TOKEN_EXPIRES_DAYS: "30"
       DB_SSL: "false"
       REDIS_ENABLED: "false"
       STORAGE_PROVIDER: local
+      UPLOAD_DIR: /tmp/test-uploads
+      LOG_LEVEL: error
 
     steps:
       - name: Checkout
@@ -55,12 +62,26 @@ jobs:
       - name: Syntax check (node --check)
         run: npm run check
 
-      - name: Run database migrations
+      - name: Run database migrations on test DB
         run: npm run migrate
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Run integration tests
+        run: npm run test:ci
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: coverage/backend/
+          retention-days: 7
 
   # ── Frontend ─────────────────────────────────────────────────────────────────
   frontend:
-    name: Frontend — build check
+    name: Frontend — test & build
     runs-on: ubuntu-latest
 
     defaults:
@@ -70,7 +91,6 @@ jobs:
     env:
       REACT_APP_API_URL: http://localhost:5000
       REACT_APP_SOCKET_URL: http://localhost:5000
-      # Sentry DSN intentionally blank in CI — Sentry no-ops when unset
       REACT_APP_SENTRY_DSN: ""
 
     steps:
@@ -87,8 +107,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Run frontend tests
+        run: npm test -- --watchAll=false --passWithNoTests
+
       - name: Build
         run: npm run build
         env:
-          # Suppress CRA treating warnings as errors in CI
           CI: "false"

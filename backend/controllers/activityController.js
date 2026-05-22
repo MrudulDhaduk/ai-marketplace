@@ -150,6 +150,7 @@ async function approveEntry(req, res) {
     }
 
     // ── Typed events (Phase 4) — with ack ──────────────────────────────────
+    const seqId = Date.now();
     const approvalEnvelope = emitTypedEvent(req.io.to(`project_${id}`), EVENTS.APPROVAL_GRANTED, {
       projectId:  Number(id),
       actorId:    req.user.id,

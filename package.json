@@ -8,14 +8,24 @@
     "dev": "nodemon backend/server.js",
     "check": "node --check backend/server.js && node --check backend/routes/index.js && node --check backend/sockets/index.js",
     "migrate": "node backend/db/migrate.js",
+    "migrate:test": "cross-env DATABASE_URL=postgresql://postgres:ghanshyam@localhost:5432/ai_marketplace_test node backend/db/migrate.js",
     "migrate:psql": "psql \"$DATABASE_URL\" -f backend/db/migrations/001_security_indexes.sql -f backend/db/migrations/002_notifications.sql -f backend/db/migrations/003_messages.sql -f backend/db/migrations/004_project_events.sql -f backend/db/migrations/005_required_additions.sql",
-    "migrate:005": "psql \"$DATABASE_URL\" -f backend/db/migrations/005_required_additions.sql"
+    "migrate:005": "psql \"$DATABASE_URL\" -f backend/db/migrations/005_required_additions.sql",
+    "test": "jest --runInBand",
+    "test:watch": "jest --runInBand --watch",
+    "test:coverage": "jest --runInBand --coverage",
+    "test:unit": "jest --runInBand --testPathPattern=backend/tests/unit",
+    "test:integration": "jest --runInBand --testPathPattern=backend/tests/integration",
+    "test:ci": "cross-env TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ai_marketplace_test jest --runInBand --forceExit"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "cross-env": "^7.0.3",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.14",
+    "supertest": "^7.0.0"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.840.0",
