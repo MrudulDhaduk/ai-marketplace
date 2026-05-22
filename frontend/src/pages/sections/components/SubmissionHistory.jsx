@@ -22,7 +22,6 @@ import TimelineFilters from "./TimelineFilters";
 import {
   useProjectActivity,
   useProjectSubmissions,
-  invalidateProjectActivity,
 } from "../../../hooks/useProjectQueries";
 import { queryClient } from "../../../lib/queryClient";
 import { queryKeys } from "../../../lib/queryKeys";

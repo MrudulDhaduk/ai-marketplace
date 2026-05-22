@@ -64,7 +64,6 @@ export default function FileManager({
     useFileUpload(projectId);
 
   const {
-    dragIndex,
     dragOver,
     handleDragStart,
     handleDragEnter,

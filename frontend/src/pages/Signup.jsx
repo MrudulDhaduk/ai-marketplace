@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import "../auth.css";
-import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../lib/api";
 
 const FIELDS = [
@@ -252,7 +251,6 @@ function Signup() {
   const [shaking, setShaking] = useState(false);
   const [success, setSuccess] = useState(false);
   const formRef = useRef(null);
-  const navigate = useNavigate();
 
   const validate = () => {
     const newErrors = {};

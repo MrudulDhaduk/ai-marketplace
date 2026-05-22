@@ -20,7 +20,6 @@
  *
  * Requirements: 11.1, 11.2, 11.3, 11.5
  */
-import { useState } from "react";
 import { apiRequest } from "../../../lib/api";
 import { invalidateProject } from "../../../hooks/useProjectQueries";
 import { queryClient } from "../../../lib/queryClient";
@@ -43,7 +42,6 @@ export default function WorkspaceSidebar({
   onProjectUpdated,
   fileInputRef,
 }) {
-  const [actionLoading, setActionLoading] = useState(null);
 
   /* ── derived values ─────────────────────────────────────────────── */
   const isLocked = reviewStatus === "approved" || reviewStatus === "pending";

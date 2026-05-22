@@ -1,7 +1,6 @@
 import "./ProjectWorkspace.css";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSocket, useConnectionState } from "../../context/SocketContext";
-import { useAuth } from "../../context/AuthContext";
 import ConnectionStatusBar from "../../components/ConnectionStatusBar";
 import { useProjectDetail, useProjectFiles } from "../../hooks/useProjectQueries";
 import { timeAgo } from "../../utils/time";
@@ -32,7 +31,6 @@ function DeveloperProjectWorkspace({ project, onBack, onOpenMessages, onComplete
   const [activeSection, setActiveSection] = useState("overview");
   const [notification, setNotification] = useState(null);
 
-  const { currentUser } = useAuth();
   const socket = useSocket();
   const { connectionState, reconnectAttempt, onRetry } = useConnectionState();
 
@@ -68,8 +66,6 @@ function DeveloperProjectWorkspace({ project, onBack, onOpenMessages, onComplete
     repoLink                              ? "Submit latest update" : "Add repo link & submit";
 
   const versionLabel = submissionCount > 0 ? `v${submissionCount + 1}` : "v1";
-
-  const isLocked = reviewStatus === "approved" || reviewStatus === "pending";
 
   /* ── notification helper ─────────────────────────────────── */
   const pushNotif = useCallback((msg, type = "info") => {
